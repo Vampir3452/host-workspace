@@ -30,3 +30,5 @@ button.addEventListener('click', async () => {
     button.disabled = false;
   }
 });
+// Reached from the explicit update button in the cabinet: finish in one click.
+if (new URLSearchParams(location.search).get('apply') === '1') button.click();
