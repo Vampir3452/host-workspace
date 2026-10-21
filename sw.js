@@ -1,10 +1,10 @@
 // Only the public application shell is cached. Account data lives in IndexedDB.
-const VERSION = 'dev-v3';
+const VERSION = 'dev-v5';
 const DEVELOPMENT = ['localhost', '127.0.0.1'].includes(self.location.hostname);
 const SCOPE = new URL(self.registration.scope).pathname;
 const CACHE_PREFIX = `zk-shell:${SCOPE}:`;
 const CACHE = `${CACHE_PREFIX}${VERSION}`;
-const FILES = ['index.html', 'styles.css', 'app.js', 'config.js', 'icon.svg', 'manifest.webmanifest', 'lib/model.js', 'lib/wedding-template.js', 'lib/storage.js', 'lib/api.js'];
+const FILES = ['index.html', 'styles.css', 'app.js', 'config.js', 'icon.svg', 'manifest.webmanifest', 'lib/model.js', 'lib/wedding-template.js', 'lib/storage.js', 'lib/api.js', 'lib/task-import.js', 'lib/rich-text.js', 'vendor/xlsx-0.20.3.mjs', 'vendor/SHEETJS-LICENSE.txt'];
 const PATHS = new Set(FILES.map(file => new URL(file, self.registration.scope).pathname));
 
 async function publicShell(request, cacheKey) {

@@ -330,7 +330,40 @@ dialog::backdrop { background: #112c2b66; backdrop-filter: blur(3px); }
 .template-grid.compact .template-tile { display: block; min-height: 105px; padding: 20px; }
 .template-grid.compact .template-tile h3 { margin: 0 0 6px; }
 .template-grid.compact .template-tile p { margin: 0; font-size: 11px; }
-.template-editor { display: grid; gap: 20px; }
+.template-editor { display: grid; gap: 10px; }
+.template-editor > .panel { padding: 20px 24px; }
+.template-editor .panel-header { margin-bottom: 10px; }
+.own-templates { margin-top: 20px; }
+.compact-item { padding: 3px 0; }
+.compact-item .check-line { gap: 9px; align-items: flex-start; }
+.compact-item .check-input { flex-shrink: 0; margin-top: 14px; }
+.item-disclosure { min-width: 0; flex: 1; }
+.item-disclosure > summary { min-height: 44px; padding: 11px 4px; cursor: pointer; font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
+.item-title { font-weight: 500; }
+.answer-preview { display: inline-block; margin-left: 10px; color: var(--muted); font-size: 11px; }
+.compact-item .check-fields { margin: 4px 0 14px; gap: 8px; }
+.compact-item .check-fields textarea.check-label { min-height: 65px; width: 100%; }
+.compact-item.completed .item-title { color: #62775b; }
+.template-editor .checklist-section > summary { min-height: 44px; padding: 10px 0; }
+.checklist-tools { display: flex; flex-wrap: wrap; gap: 3px 12px; margin-bottom: 8px; }
+.checklist-tools .button { min-height: 40px; padding: 7px 0; font-size: 12px; }
+.question-block > summary { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; min-height: 44px; cursor: pointer; font-size: 14px; color: var(--forest); }
+.question-block > summary::before { content: '−'; }
+.question-block:not([open]) > summary::before { content: '+'; }
+.question-block > summary > span { margin-left: auto; font-size: 11px; color: var(--muted); }
+.import-file { margin-top: 24px; }
+.import-preview { padding-left: 24px; line-height: 1.7; overflow-wrap: anywhere; }
+.rich-field { margin: 12px 0; }
+.rich-editor { min-height: 145px; padding: 15px; border: 1px solid var(--line); border-top: 0; border-radius: 0 0 8px 8px; font-size: 16px; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; background: #fffefa; }
+.notebook-field .rich-editor { min-height: 240px; }
+.rich-editor:focus-visible { outline: 3px solid #ad8641; outline-offset: 2px; }
+.rich-editor p, .rich-editor div { margin: 0; }
+.rich-editor .rt-size-small { font-size: 14px; }
+.rich-editor .rt-size-normal { font-size: 16px; }
+.rich-editor .rt-size-large { font-size: 22px; }
+.rich-editor .rt-size-xlarge { font-size: 30px; }
+.rich-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; padding: 7px; border: 1px solid var(--line); border-radius: 8px 8px 0 0; background: #f5f7f0; }
+.rich-toolbar button, .rich-toolbar select { width: auto; min-height: 40px; padding: 7px 12px; border: 1px solid var(--line); border-radius: 5px; background: white; color: var(--forest); font-size: 14px; }
 .template-picker > .button { margin-top: 14px; margin-bottom: 18px; }
 .template-picker > .field-label { margin-bottom: 6px; font-size: 11px; }
 .check-line > input.check-label { min-width: 0; flex: 1; padding: 8px 7px; border-color: transparent; background: transparent; font-size: 14px; font-weight: 500; }

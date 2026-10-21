@@ -1,7 +1,9 @@
 import { CONFIG } from './config.js';
 import * as db from './lib/storage.js';
 import * as api from './lib/api.js';
-import { CATEGORIES, SCHEMA_VERSION, clone, sameContent, uid, item, applyTemplate, cleanTitle, progress, localDate, defaultTemplates, seedWeddingTemplate, demoRecords, reconcileCalendar, scriptLink, validateBackup, restorePlan } from './lib/model.js';
+import { parseTaskFile, downloadTaskWorkbook } from './lib/task-import.js';
+import { renderRichEditor, wireRichEditors } from './lib/rich-text.js';
+import { CATEGORIES, SCHEMA_VERSION, clone, sameContent, uid, item, createTemplate, applyTemplate, cleanTitle, progress, localDate, defaultTemplates, seedWeddingTemplate, demoRecords, reconcileCalendar, scriptLink, validateBackup, restorePlan } from './lib/model.js';
 
 const $ = selector => document.querySelector(selector);
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -56,6 +58,11 @@ const events = () => state.records.filter(x => x.kind === 'event');
 const templates = () => state.records.filter(x => x.kind === 'template');
 const current = () => record(state.selected);
 const conflicts = () => state.records.filter(x => x.conflict);
+wireRichEditors(({ field, text, html }) => {
+  const r = current();
+  if (r?.kind !== 'event' || !['description', 'notes'].includes(field)) return;
+  r.payload.body[field] = text; r.payload.body[`${field}Html`] = html; changed(r);
+});
 
 function toast(message) { const el = $('#toast'); el.textContent = message; el.classList.add('visible'); clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('visible'), 6000); }
 function errorMessage(error) { return error?.name === 'TimeoutError' ? 'Сервис не ответил вовремя. Данные на устройстве сохранены.' : error?.message || 'Не удалось выполнить действие.'; }
@@ -161,7 +168,7 @@ async function performSync(includeCalendar) {
   finally {
     state.syncing = false; await persistQueue.catch(() => {});
     // Don't rebuild a focused editor: this preserves caret, selection and partially typed text.
-    if (!['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName) && !$('#modal').open) render(); else updateStatus();
+    if (!['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName) && !document.activeElement?.isContentEditable && !document.activeElement?.closest('.rich-field') && !$('#modal').open) render(); else updateStatus();
     if (state.records.some(r => r.dirty && !r.conflict) && !state.cloudError) { clearTimeout(syncTimer); syncTimer = setTimeout(() => sync(false), 1800); }
   }
 }
@@ -234,7 +241,7 @@ function field(label, value, data, options = {}) {
 function eventView() {
   const r = current(); if (!r) return emptyState('Карточка не найдена', 'Вернись к списку мероприятий.');
   const { source: s, body: b } = r.payload, p = progress(b);
-  return `<div class="page-heading event-heading"><div>${button('back-calendar', 'Все мероприятия', 'back', 'ghost')}<h1>${esc(cleanTitle(s.title))}</h1><p class="subtitle">${icon('calendar')} ${esc(dateLabel(s))}</p></div>${badge(s.status)}</div>${s.status === 'deleted' ? '<p class="notice">Событие удалено из Google Календаря. Все материалы подготовки сохранены.</p>' : ''}<div class="editor-layout"><div class="editor-main"><section class="panel">${editorHeading('01', 'О мероприятии', 'Контекст, пожелания и важные детали')}${field('Описание', b.description, 'description', { placeholder: 'Какой вечер готовим? Что важно учесть?', class: 'description-field', rows: 4 })}${s.calendarDescription ? `<details class="calendar-description"><summary>Исходное описание из Google Календаря</summary><p class="plain-text">${esc(s.calendarDescription)}</p></details>` : ''}</section><section class="panel">${editorHeading('02', 'Быстрые заметки', 'Твой блокнот для звонков, встреч и внезапных идей')}${field('Заметки', b.notes, 'notes', { placeholder: 'Пиши здесь, как в блокнот…', class: 'notebook', rows: 8 })}<p class="form-help">Сохраняется автоматически на этом устройстве.</p></section><section class="panel">${editorHeading('03', 'Обсуждение мероприятия', 'Собери ответы, прежде чем приступать к подготовке', `<span class="section-progress">${b.questions.filter(x => x.done).length}/${b.questions.length}</span>`)}<div class="checklist">${b.questions.length ? renderChecklist(b.questions, 'questions') : '<p class="form-help">Выбери шаблон или добавь первый вопрос для заказчика.</p>'}</div>${button('add-question', 'Добавить вопрос', 'plus', 'ghost')}</section><section class="panel">${editorHeading('04', 'Подготовка', 'Шаг за шагом — к готовому мероприятию', `<span class="section-progress">${b.tasks.filter(x => x.done).length}/${b.tasks.length}</span>`)}<div class="checklist">${b.tasks.length ? renderChecklist(b.tasks, 'tasks') : '<p class="form-help">Добавь задачи подготовки или примени шаблон.</p>'}</div>${button('add-task', 'Добавить задачу', 'plus', 'ghost')}</section><section class="panel">${editorHeading('05', 'Конечный сценарий', 'Основная версия — в Google Документах')}${field('Ссылка на Google Документ', b.scriptUrl, 'scriptUrl', { input: 'url', placeholder: 'https://docs.google.com/document/d/…', attrs: 'aria-describedby="script-help"' })}<p id="script-help" class="form-help">Чтобы открыть сценарий без интернета, заранее настрой офлайн-доступ в Google Документах.</p><div id="script-open">${scriptAction(b.scriptUrl)}</div></section></div><aside class="editor-aside"><section class="panel"><p class="section-label">ГОТОВНОСТЬ МЕРОПРИЯТИЯ</p><div class="summary-progress"><strong id="progress-percent">${p.percent}%</strong><span>шаг за шагом</span></div><progress id="event-progress" value="${p.percent}" max="100" aria-label="Готовность мероприятия"></progress><p class="form-help" id="progress-count">${p.done} из ${p.total} пунктов выполнено</p><div class="meta-list"><div class="meta-row">${icon('calendar')}<span>${esc(fmt(s.start, { day: 'numeric', month: 'long', year: 'numeric' }))}</span></div><div class="meta-row">${icon('clock')}<span>${s.allDay ? 'Время не указано в календаре' : `${fmt(s.start, { hour: '2-digit', minute: '2-digit' })}${s.end ? ` — ${fmt(s.end, { hour: '2-digit', minute: '2-digit' })}` : ''}`}</span></div>${s.location ? `<div class="meta-row">${icon('pin')}<span>${esc(s.location)}</span></div>` : ''}</div></section><section class="panel template-picker"><p class="section-label">ШАБЛОН ПОДГОТОВКИ</p><h3>${esc(CATEGORIES[b.category])}</h3><p class="form-help">${b.templateId ? 'Копия шаблона. Все изменения остаются только в этом мероприятии.' : 'Подбери вопросы и задачи под формат мероприятия.'}</p>${button('choose-template', b.templateId ? 'Добавить из шаблона' : 'Выбрать шаблон', 'templates', 'secondary')}<label class="field-label" for="event-category">Тип мероприятия</label><select id="event-category" data-field="category">${Object.entries(CATEGORIES).map(([id, label]) => `<option value="${id}" ${b.category === id ? 'selected' : ''}>${label}</option>`).join('')}</select></section><section class="notice">${icon('check')}<p id="offline-ready">Сохранено для работы на этом устройстве. Для первого открытия на другом устройстве нужен интернет.</p></section></aside></div>`;
+  return `<div class="page-heading event-heading"><div>${button('back-calendar', 'Все мероприятия', 'back', 'ghost')}<h1>${esc(cleanTitle(s.title))}</h1><p class="subtitle">${icon('calendar')} ${esc(dateLabel(s))}</p></div>${badge(s.status)}</div>${s.status === 'deleted' ? '<p class="notice">Событие удалено из Google Календаря. Все материалы подготовки сохранены.</p>' : ''}<div class="editor-layout"><div class="editor-main"><section class="panel">${editorHeading('01', 'О мероприятии', 'Контекст, пожелания и важные детали')}${renderRichEditor('description', 'Описание', b.description, b.descriptionHtml)}${b.category === 'wedding' ? field('Анкеты', b.questionnaires || '', 'questionnaires', {placeholder:'Вставь сюда текст анкет молодожёнов…',rows:8,class:'questionnaires-field'}) : ''}${s.calendarDescription ? `<details class="calendar-description"><summary>Исходное описание из Google Календаря</summary><p class="plain-text">${esc(s.calendarDescription)}</p></details>` : ''}</section><section class="panel">${editorHeading('02', 'Быстрые заметки', 'Твой блокнот для звонков, встреч и внезапных идей')}${renderRichEditor('notes', 'Заметки', b.notes, b.notesHtml, {className:'notebook-field'})}<p class="form-help">${state.demo ? 'Демо: заметки сохраняются только в этом браузере.' : 'Автосохранение на устройстве и синхронизация с облаком при наличии интернета.'}</p></section><section class="panel">${editorHeading('03', 'Обсуждение мероприятия', 'Собери ответы, прежде чем приступать к подготовке', `<span class="section-progress">${b.questions.filter(x => x.done).length}/${b.questions.length}</span>`)}${eventQuestions(b)}${button('add-question', 'Добавить вопрос', 'plus', 'ghost')}</section><section class="panel">${editorHeading('04', 'Подготовка', 'Шаг за шагом — к готовому мероприятию', `<span class="section-progress">${b.tasks.filter(x => x.done).length}/${b.tasks.length}</span>`)}${checklistTools('tasks')}<div class="checklist">${b.tasks.length ? renderChecklist(b.tasks, 'tasks') : '<p class="form-help">Добавь задачи подготовки или примени шаблон.</p>'}</div>${button('add-task', 'Добавить задачу', 'plus', 'ghost')}</section><section class="panel">${editorHeading('05', 'Конечный сценарий', 'Основная версия — в Google Документах')}${field('Ссылка на Google Документ', b.scriptUrl, 'scriptUrl', { input: 'url', placeholder: 'https://docs.google.com/document/d/…', attrs: 'aria-describedby="script-help"' })}<p id="script-help" class="form-help">Чтобы открыть сценарий без интернета, заранее настрой офлайн-доступ в Google Документах.</p><div id="script-open">${scriptAction(b.scriptUrl)}</div></section></div><aside class="editor-aside"><section class="panel"><p class="section-label">ГОТОВНОСТЬ МЕРОПРИЯТИЯ</p><div class="summary-progress"><strong id="progress-percent">${p.percent}%</strong><span>шаг за шагом</span></div><progress id="event-progress" value="${p.percent}" max="100" aria-label="Готовность мероприятия"></progress><p class="form-help" id="progress-count">${p.done} из ${p.total} пунктов выполнено</p><div class="meta-list"><div class="meta-row">${icon('calendar')}<span>${esc(fmt(s.start, { day: 'numeric', month: 'long', year: 'numeric' }))}</span></div><div class="meta-row">${icon('clock')}<span>${s.allDay ? 'Время не указано в календаре' : `${fmt(s.start, { hour: '2-digit', minute: '2-digit' })}${s.end ? ` — ${fmt(s.end, { hour: '2-digit', minute: '2-digit' })}` : ''}`}</span></div>${s.location ? `<div class="meta-row">${icon('pin')}<span>${esc(s.location)}</span></div>` : ''}</div></section><section class="panel template-picker"><p class="section-label">ШАБЛОН ПОДГОТОВКИ</p><h3>${esc(CATEGORIES[b.category])}</h3><p class="form-help">${b.templateId ? 'Копия шаблона. Все изменения остаются только в этом мероприятии.' : 'Подбери вопросы и задачи под формат мероприятия.'}</p>${button('choose-template', b.templateId ? 'Добавить из шаблона' : 'Выбрать шаблон', 'templates', 'secondary')}<label class="field-label" for="event-category">Тип мероприятия</label><select id="event-category" data-field="category">${Object.entries(CATEGORIES).map(([id, label]) => `<option value="${id}" ${b.category === id ? 'selected' : ''}>${label}</option>`).join('')}</select></section><section class="notice">${icon('check')}<p id="offline-ready">Сохранено для работы на этом устройстве. Для первого открытия на другом устройстве нужен интернет.</p></section></aside></div>`;
 }
 function scriptAction(value) {
   const url = scriptLink(value);
@@ -244,7 +251,31 @@ function checklistItem(x, group, template = false) {
   const id = `${group}-${x.id}`;
   const attrs = name => `data-item-field="${name}" data-group="${group}" data-id="${esc(x.id)}"`;
   const settings = `<details class="item-settings"><summary>Раздел и подсказка</summary><label class="field">Раздел<input aria-label="Раздел пункта" ${attrs('section')} value="${esc(x.section)}" placeholder="Без раздела"></label><label class="field">Подсказка<textarea aria-label="Подсказка к пункту" rows="3" ${attrs('hint')} placeholder="Варианты, примеры и детали">${esc(x.hint)}</textarea></label></details>`;
-  return `<div class="check-item ${x.done ? 'completed' : ''}" data-item="${esc(x.id)}"><div class="check-line">${!template ? `<input class="check-input" type="checkbox" id="done-${id}" data-check="${group}" data-id="${esc(x.id)}" ${x.done ? 'checked' : ''} aria-label="${group === 'questions' ? 'Обсуждено' : 'Готово'}: ${esc(x.label)}">` : ''}<textarea rows="2" class="check-label" aria-label="${group === 'questions' ? 'Вопрос' : 'Задача'}" ${attrs('label')} placeholder="${group === 'questions' ? 'Напиши вопрос' : 'Напиши задачу'}">${esc(x.label)}</textarea>${iconButton('remove-item', 'Удалить пункт', 'trash', `data-group="${group}" data-id="${esc(x.id)}"`)}</div><div class="check-fields">${x.hint ? `<p class="item-hint">${esc(x.hint)}</p>` : ''}${!template ? `${group === 'questions' ? `<label for="answer-${id}" class="field-label">Ответ</label><textarea rows="2" id="answer-${id}" class="answer" ${attrs('answer')} placeholder="Ответ заказчика">${esc(x.answer)}</textarea>` : ''}<details ${x.comment ? 'open' : ''}><summary>Комментарий · необязательно</summary><textarea aria-label="Комментарий к пункту" rows="2" class="comment" ${attrs('comment')} placeholder="Дополнительные детали">${esc(x.comment)}</textarea></details><span class="form-help check-state">${x.done ? (group === 'questions' ? 'Обсуждено' : 'Готово') : ''}</span>` : ''}${settings}</div></div>`;
+  return `<div class="check-item compact-item ${x.done ? 'completed' : ''}" data-item="${esc(x.id)}"><div class="check-line">${!template ? `<input class="check-input" type="checkbox" id="done-${id}" data-check="${group}" data-id="${esc(x.id)}" ${x.done ? 'checked' : ''} aria-label="${group === 'questions' ? 'Обсуждено' : 'Готово'}: ${esc(x.label)}">` : ''}<details class="item-disclosure" data-section-key="item:${esc(id)}"><summary><span class="item-title">${esc(x.label || (group === 'questions' ? 'Новый вопрос' : 'Новая задача'))}</span>${!template && group === 'questions' ? `<span class="answer-preview">${x.answer ? 'Ответ записан' : 'Нет ответа'}</span>` : ''}</summary><div class="check-fields"><label class="field">${group === 'questions' ? 'Вопрос' : 'Задача'}<textarea rows="2" class="check-label" aria-label="${group === 'questions' ? 'Вопрос' : 'Задача'}" ${attrs('label')}>${esc(x.label)}</textarea></label>${x.hint ? `<p class="item-hint">${esc(x.hint)}</p>` : ''}${!template ? `${group === 'questions' ? `<label for="answer-${id}" class="field-label">Ответ</label><textarea rows="2" id="answer-${id}" class="answer" ${attrs('answer')} placeholder="Ответ заказчика">${esc(x.answer)}</textarea>` : ''}<details ${x.comment ? 'open' : ''}><summary>Комментарий · необязательно</summary><textarea aria-label="Комментарий к пункту" rows="2" class="comment" ${attrs('comment')}>${esc(x.comment)}</textarea></details><span class="form-help check-state">${x.done ? (group === 'questions' ? 'Обсуждено' : 'Готово') : ''}</span>` : ''}${settings}<div>${button('remove-item', 'Удалить пункт', 'trash', 'ghost', `data-group="${group}" data-id="${esc(x.id)}"`)}</div></div></details></div></div>`;
+}
+function checklistTools(group) {
+  return `<div class="checklist-tools">${button('toggle-items', 'Развернуть пункты', '', 'ghost', `data-group="${group}" aria-expanded="false"`)}${group === 'tasks' ? button('import-tasks', 'Импорт из Excel', 'upload', 'ghost') : ''}</div>`;
+}
+function eventQuestions(body) {
+  return `<details class="question-block" data-section-key="question-block" open><summary>Вопросы и ответы · ${body.questions.length}<span>Показать / скрыть</span></summary>${checklistTools('questions')}<div class="checklist">${body.questions.length ? renderChecklist(body.questions, 'questions') : '<p class="form-help">Выбери шаблон или добавь вопрос.</p>'}</div></details>`;
+}
+function showCreateTemplate() {
+  modal('Свой шаблон', `<label class="field">Название<input id="new-template-name" maxlength="120" placeholder="Например, камерная свадьба"></label><label class="field">Тип мероприятия<select id="new-template-category">${Object.entries(CATEGORIES).map(([id,label]) => `<option value="${id}">${label}</option>`).join('')}</select></label>`, `${button('close-modal','Отмена','','secondary')}${button('create-template','Создать шаблон','plus','primary')}`);
+  $('#new-template-name').focus();
+}
+let pendingTaskImport;
+function showTaskImport() {
+  pendingTaskImport = null;
+  modal('Задачи из Excel', `<p>В первом столбце — задачи, каждая с новой строки. Первая строка «Задача» — заголовок. Пустые строки пропускаются.</p>${button('download-task-workbook','Скачать шаблон .xlsx','download','secondary')}<label class="field import-file">Выбрать файл<input id="task-import-file" type="file" accept=".xlsx,.xls,.csv,.txt"></label><p class="form-help">До 2 МБ и 500 задач. Файл обрабатывается на устройстве. Задачи добавятся к существующим.</p>`);
+}
+async function previewTaskImport(file) {
+  if (!file) return;
+  const targetId = state.selected, labels = await parseTaskFile(file), target = record(targetId);
+  if (state.selected !== targetId || !target || !$('#modal').open) return;
+  const body = target.kind === 'event' ? target.payload.body : target.payload;
+  if (body.tasks.length + labels.length > 500) throw new Error('В одном списке может быть не больше 500 задач. Уменьши файл или текущий список.');
+  pendingTaskImport = { targetId, labels };
+  modal('Проверка импорта', `<p>Будет добавлено задач: <strong>${labels.length}</strong>.</p><ol class="import-preview">${labels.slice(0,8).map(label=>`<li>${esc(label)}</li>`).join('')}</ol>${labels.length > 8 ? `<p>И ещё ${labels.length - 8}.</p>` : ''}<p class="form-help">Текущие пункты и отметки сохранятся.</p>`, `${button('close-modal','Отмена','','secondary')}${button('confirm-task-import','Добавить задачи','plus','primary')}`);
 }
 function renderChecklist(items, group, template = false) {
   if (!items.some(x => x.section?.trim())) return items.map(x => checklistItem(x, group, template)).join('');
@@ -258,8 +289,8 @@ function renderChecklist(items, group, template = false) {
 }
 function templatesView() {
   const t = current();
-  if (t?.kind === 'template') return `<div class="page-heading"><div>${button('back-templates', 'Все шаблоны', 'back', 'ghost')}<p class="eyebrow">ОСНОВА ДЛЯ НОВЫХ МЕРОПРИЯТИЙ</p><h1>${esc(t.payload.name)}</h1><p class="subtitle">Правки действуют на будущие копии. Уже созданные карточки не меняются.</p></div></div><div class="template-editor"><section class="panel">${field('Название шаблона', t.payload.name, 'template-name', { input: 'text' })}</section><section class="panel">${editorHeading('01', 'Вопросы для обсуждения', 'У каждого вопроса в карточке появится поле ответа')}<div class="checklist">${renderChecklist(t.payload.questions, 'questions', true)}</div>${button('add-question', 'Добавить вопрос', 'plus', 'ghost')}</section><section class="panel">${editorHeading('02', 'Задачи подготовки', 'Копируются в мероприятие без отметок о выполнении')}<div class="checklist">${renderChecklist(t.payload.tasks, 'tasks', true)}</div>${button('add-task', 'Добавить задачу', 'plus', 'ghost')}</section></div>`;
-  return `<div class="page-heading"><div><p class="eyebrow">ПОДГОТОВКА НАЧИНАЕТСЯ НЕ С НУЛЯ</p><h1>Твои шаблоны<span class="heading-dot">.</span></h1><p class="subtitle">Собери вопросы и задачи один раз. Адаптируй их под каждый новый вечер.</p></div></div><div class="template-grid">${templates().map(r => `<button class="template-tile" data-action="open-template" data-id="${esc(r.id)}"><span class="template-icon">${icon(r.payload.category === 'wedding' ? 'heart' : r.payload.category === 'birthday' ? 'spark' : 'templates')}</span><h2>${esc(r.payload.name)}</h2><p>${r.payload.questions.length} вопросов · ${r.payload.tasks.length} задач</p><span class="template-count">Редактировать шаблон ${icon('arrow')}</span></button>`).join('')}</div><div class="notice">${icon('note')}<p>Свадебный шаблон готов: вопросы для пары и отдельные задачи подготовки. Лишние пункты можно удалить, формулировки — изменить. «Другое» создаётся без шаблона; вопросы и задачи можно добавить вручную.</p></div>`;
+  if (t?.kind === 'template') return `<div class="page-heading"><div>${button('back-templates', 'Все шаблоны', 'back', 'ghost')}<p class="eyebrow">ОСНОВА ДЛЯ НОВЫХ МЕРОПРИЯТИЙ</p><h1>${esc(t.payload.name)}</h1><p class="subtitle">Правки действуют на будущие копии. Уже созданные карточки не меняются.</p></div></div><div class="template-editor"><section class="panel">${field('Название шаблона', t.payload.name, 'template-name', { input: 'text' })}</section><section class="panel">${editorHeading('01', 'Вопросы для обсуждения', 'У каждого вопроса в карточке появится поле ответа')}${checklistTools('questions')}<div class="checklist">${renderChecklist(t.payload.questions, 'questions', true)}</div>${button('add-question', 'Добавить вопрос', 'plus', 'ghost')}</section><section class="panel">${editorHeading('02', 'Задачи подготовки', 'Копируются в мероприятие без отметок о выполнении')}${checklistTools('tasks')}<div class="checklist">${renderChecklist(t.payload.tasks, 'tasks', true)}</div>${button('add-task', 'Добавить задачу', 'plus', 'ghost')}</section></div>`;
+  return `<div class="page-heading"><div><p class="eyebrow">ПОДГОТОВКА НАЧИНАЕТСЯ НЕ С НУЛЯ</p><h1>Твои шаблоны<span class="heading-dot">.</span></h1><p class="subtitle">Собери вопросы и задачи один раз. Адаптируй их под каждый новый вечер.</p></div></div>${button('new-template', 'Создать свой шаблон', 'plus', 'primary')}<div class="template-grid own-templates">${templates().map(r => `<button class="template-tile" data-action="open-template" data-id="${esc(r.id)}"><span class="template-icon">${icon(r.payload.category === 'wedding' ? 'heart' : r.payload.category === 'birthday' ? 'spark' : 'templates')}</span><h2>${esc(r.payload.name)}</h2><p>${r.payload.questions.length} вопросов · ${r.payload.tasks.length} задач</p><span class="template-count">Редактировать шаблон ${icon('arrow')}</span></button>`).join('')}</div><div class="notice">${icon('note')}<p>Свадебный шаблон готов: вопросы для пары и отдельные задачи подготовки. Лишние пункты можно удалить, формулировки — изменить. «Другое» создаётся без шаблона; вопросы и задачи можно добавить вручную.</p></div>`;
 }
 function settingsView() {
   return `<div class="page-heading"><div><p class="eyebrow">ВСЁ ПОД КОНТРОЛЕМ</p><h1>Настройки<span class="heading-dot">.</span></h1><p class="subtitle">Подключения, сохранность данных и доступ с твоих устройств.</p></div></div><div class="settings-grid"><section class="panel settings-card"><h2>${icon('calendar')} Google Календарь</h2><p>🎤 Ведущий/Хобби</p><p class="form-help">Импортируются «Заказ:» и «?Заказ:». Даты и время меняются в Google Календаре. Доступ — только на чтение.</p><p>${state.lastCalendar ? `Последнее обновление: ${esc(fmt(state.lastCalendar, { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }))}` : 'Ещё не синхронизирован'}</p><div class="script-actions">${button('sync', 'Обновить', 'refresh', 'secondary')}${!state.demo ? button('login', 'Переподключить Google', 'external', 'ghost') : ''}</div></section><section class="panel settings-card"><h2>${icon('download')} Резервная копия</h2><p>Все карточки, ответы, заметки и шаблоны — в одном файле.</p><p class="form-help">В копии только ссылки на сценарии. Содержимое Google Документов сохраняется отдельно. Файл содержит личные записи — храни его у себя.</p><p class="form-help">${state.lastBackup ? `Последняя выгрузка: ${esc(fmt(state.lastBackup, { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }))}` : 'Резервная копия ещё не скачивалась'}</p><div class="script-actions">${button('backup', 'Скачать копию', 'download', 'primary')}${button('restore', 'Восстановить', 'upload', 'secondary')}</div><input type="file" id="restore-file" accept="application/json,.json" hidden></section><section class="panel settings-card"><h2>${icon('cloud')} Сохранение и устройства</h2><p>Карточки сохраняются на устройстве и отправляются в облако при наличии связи.</p><p class="form-help">Перед выездом открой нужную карточку на телефоне. Для сценария отдельно включи офлайн-доступ в Google Документах. На общем устройстве после работы выйди из кабинета.</p>${button('storage', 'Проверить офлайн-доступ', 'check', 'secondary')}<p id="storage-info" class="form-help"></p></section><section class="panel settings-card"><h2>${icon('note')} Разные версии</h2><p>${conflicts().length ? `Требуют выбора: ${conflicts().length}` : 'Конфликтов нет. Все версии согласованы.'}</p><p class="form-help">Если правки с двух устройств разойдутся, ни одна версия не будет перезаписана без твоего выбора.</p>${conflicts().length ? button('conflicts', 'Посмотреть версии', '', 'secondary') : ''}</section></div>`;
@@ -361,6 +392,25 @@ document.addEventListener('click', safeAction(async e => {
   const action = el.dataset.action;
   if (action === 'login') return api.login();
   if (action === 'demo') return enterDemo();
+  if (action === 'new-template') return showCreateTemplate();
+  if (action === 'create-template') {
+    const next = createTemplate($('#new-template-name').value, $('#new-template-category').value);
+    state.records.push(next); persist(next); closeModal(); navigate('templates', next.id); toast('Свой шаблон создан. Добавь вопросы и задачи.'); return;
+  }
+  if (action === 'import-tasks') return showTaskImport();
+  if (action === 'download-task-workbook') return downloadTaskWorkbook();
+  if (action === 'confirm-task-import') {
+    const pending = pendingTaskImport, r = pending && record(pending.targetId);
+    if (!r || state.selected !== pending.targetId) throw new Error('Открой нужную карточку и повтори импорт.');
+    const body = r.kind === 'event' ? r.payload.body : r.payload;
+    if (body.tasks.length + pending.labels.length > 500) throw new Error('Не больше 500 задач в одном списке.');
+    body.tasks.push(...pending.labels.map(label => item(label))); changed(r); pendingTaskImport = null; closeModal(); render(); toast(`Добавлено задач: ${pending.labels.length}`); return;
+  }
+  if (action === 'toggle-items') {
+    const panel = el.closest('.panel'), items = [...panel.querySelectorAll('.item-disclosure')], expand = !items.every(x => x.open);
+    for (const details of panel.querySelectorAll('.checklist-section, .item-disclosure')) details.open = expand;
+    el.setAttribute('aria-expanded', String(expand)); el.querySelector('span').textContent = expand ? 'Свернуть пункты' : 'Развернуть пункты'; return;
+  }
   if (action === 'navigate') return navigate(el.dataset.route);
   if (action === 'close-modal') return closeModal();
   if (action === 'exit') return leave();
@@ -386,7 +436,10 @@ document.addEventListener('click', safeAction(async e => {
   }
   if (action === 'add-question' || action === 'add-task') {
     const r = current(), body = r.kind === 'event' ? r.payload.body : r.payload, group = action === 'add-question' ? 'questions' : 'tasks';
-    const x = item(); body[group].push(x); changed(r); render(); document.querySelector(`[data-item-field="label"][data-id="${x.id}"]`)?.focus(); return;
+    if (body[group].length >= 500) throw new Error('Не больше 500 пунктов в одном списке.');
+    const x = item(); body[group].push(x); changed(r); render(); const input = document.querySelector(`[data-item-field="label"][data-id="${x.id}"]`);
+    for (let ancestor = input?.parentElement; ancestor; ancestor = ancestor.parentElement) if (ancestor.tagName === 'DETAILS') ancestor.open = true;
+    input?.focus(); return;
   }
   if (action === 'remove-item') {
     const r = current(), body = r.kind === 'event' ? r.payload.body : r.payload, group = el.dataset.group, x = body[group]?.find(x => x.id === el.dataset.id); if (!x) return;
@@ -414,7 +467,8 @@ document.addEventListener('input', safeAction(async e => {
   if (el.dataset.field) {
     const key = el.dataset.field;
     if (r.kind === 'template' && key === 'template-name') r.payload.name = el.value;
-    else if (r.kind === 'event' && ['description', 'notes', 'category', 'scriptUrl'].includes(key)) {
+    else if (r.kind === 'template' && key === 'template-category' && Object.hasOwn(CATEGORIES, el.value)) r.payload.category = el.value;
+    else if (r.kind === 'event' && ['description', 'notes', 'category', 'scriptUrl', 'questionnaires'].includes(key)) {
       if (key === 'scriptUrl') {
         const checked = scriptLink(el.value);
         $('#script-open').innerHTML = scriptAction(el.value);
@@ -424,11 +478,15 @@ document.addEventListener('input', safeAction(async e => {
       } else r.payload.body[key] = el.value;
     } else return;
     changed(r);
+    if (key === 'category') render();
   }
   if (el.dataset.itemField && ['label', 'answer', 'comment', 'section', 'hint'].includes(el.dataset.itemField)) {
     const body = r.kind === 'event' ? r.payload.body : r.payload, x = body[el.dataset.group]?.find(x => x.id === el.dataset.id);
     if (x) {
       x[el.dataset.itemField] = el.value;
+      const container = el.closest('.check-item');
+      if (el.dataset.itemField === 'label') container.querySelector('.item-title').textContent = el.value || 'Новый пункт';
+      if (el.dataset.itemField === 'answer' && container.querySelector('.answer-preview')) container.querySelector('.answer-preview').textContent = el.value ? 'Ответ записан' : 'Нет ответа';
       if (el.dataset.itemField === 'label') el.closest('.check-item')?.querySelector('.check-input')?.setAttribute('aria-label', `${el.dataset.group === 'questions' ? 'Обсуждено' : 'Готово'}: ${el.value}`);
       changed(r);
     }
@@ -437,6 +495,7 @@ document.addEventListener('input', safeAction(async e => {
 document.addEventListener('change', safeAction(async e => {
   const el = e.target;
   if (el.id === 'restore-file') return previewRestore(el.files[0]);
+  if (el.id === 'task-import-file') return previewTaskImport(el.files[0]);
   if (el.dataset.check) {
     const r = current(), body = r?.payload.body, x = body?.[el.dataset.check]?.find(x => x.id === el.dataset.id); if (!x) return;
     x.done = el.checked; changed(r);

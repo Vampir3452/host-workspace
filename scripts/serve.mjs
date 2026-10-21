@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { PUBLIC_FILES } from './public-files.mjs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const allowed = new Set(PUBLIC_FILES);
-const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json' };
+const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json' };
 const port = Number(process.env.PORT || 4180);
 if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error('PORT must be a valid unprivileged port');
 const server = http.createServer(async (req, res) => {
