@@ -215,12 +215,10 @@ textarea { display: block; resize: vertical; min-height: 110px; }
 .checklist-section > summary::-webkit-details-marker { display: none; }
 .group-progress { margin-left: auto; flex-shrink: 0; color: var(--muted); font-size: 12px; font-weight: 400; }
 .item-hint { margin: 0 0 5px; color: #606b58; font-size: 12px; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
-.item-settings > .field { margin-top: 10px; }
-.item-settings textarea { min-height: 85px; }
 .check-label input[type="text"], .check-line > input[type="text"] { padding: 4px 5px; min-height: 37px; border-color: transparent; background: transparent; font-weight: 500; }
 .check-label input[type="text"]:hover, .check-line > input[type="text"]:hover { border-color: var(--line); background: #fafcf7; }
 .check-line .icon-button { min-height: 36px; height: 36px; width: 36px; color: #8c9585; }
-.check-line label { display: flex; align-items: center; gap: 10px; min-height: 40px; }
+.check-line > .check-hit { display: grid; place-items: center; min-height: 44px; }
 input[type="checkbox"], .check-input { width: 19px; height: 19px; margin: 10px 2px 0 0; flex: 0 0 auto; accent-color: var(--forest); cursor: pointer; }
 .check-line > label:has(input[type="checkbox"]) { min-width: 34px; min-height: 40px; }
 .check-line > label input[type="checkbox"] { margin-top: 0; }
@@ -390,7 +388,6 @@ dialog::backdrop { background: #112c2b66; backdrop-filter: blur(3px); }
 .check-line > input.check-label:hover { border-color: var(--line); }
 .check-item.completed .check-label { color: #708269; }
 .check-item.completed .check-input { opacity: .85; }
-.check-state { min-height: 14px; color: #5c7b4d; }
 .sidebar > .section-label { margin-left: 12px; font-size: 8px; letter-spacing: .1em; }
 .sidebar-bottom > .notice { display: block; margin-bottom: 19px; padding: 13px; background: #e6ebdf; border-color: #d7decc; color: #65765a; }
 .sidebar-bottom > .notice svg { margin-bottom: 7px; width: 17px; height: 17px; }
@@ -601,6 +598,42 @@ dialog::backdrop { background: #112c2b66; backdrop-filter: blur(3px); }
   .panel { padding-left: 15px; padding-right: 15px; }
   .check-fields { margin-left: 24px; }
 }
+
+/* Dense checklist layout: spacing follows content, not empty form rows. */
+.editor-main { gap: 16px; }
+.list-panel { padding: 20px 24px; }
+.list-panel .panel-header { gap: 8px; margin-bottom: 10px; }
+.list-panel .panel-header > .section-progress { margin-left: auto; }
+.list-panel .panel-header > .button { padding: 5px 8px; font-size: 12px; min-height: 40px; }
+.compact-item, .compact-item:first-child, .compact-item:last-child { padding: 0; }
+.compact-item .check-line { gap: 6px; }
+.item-disclosure > summary { min-height: 44px; padding: 10px 2px; font-size: 14px; line-height: 1.5; }
+.answer-preview:empty, .item-disclosure[open] > summary .answer-preview { display: none; }
+.compact-item .check-fields { margin: 0 0 8px; gap: 6px; }
+.check-fields .field { display: grid; align-items: stretch; min-height: 0; margin: 0; gap: 4px; }
+.check-fields .field > span, .check-fields .field-label { min-height: 0; line-height: 1.4; }
+.check-fields textarea, .compact-item .check-fields textarea.check-label { min-height: 42px; padding: 8px 10px; font-size: 14px; line-height: 1.5; overflow-y: hidden; }
+.item-hint { margin: 0; font-size: 12px; line-height: 1.5; }
+.item-actions { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 0 16px; }
+.item-actions > details { min-width: 0; }
+.item-actions > details > summary { cursor: pointer; min-height: 44px; padding: 12px 2px; font-size: 12px; line-height: 20px; color: #64745c; }
+.item-actions > .icon-button { width: 44px; height: 44px; min-height: 44px; margin-left: auto; }
+.item-actions > details[open] { flex-basis: 100%; }
+.item-edit-fields { display: grid; gap: 8px; padding: 0 0 4px; }
+.item-comment textarea { width: 100%; margin-bottom: 4px; }
+.checklist-tools { gap: 0 14px; margin: 0 0 4px; }
+.checklist-tools .button { min-height: 40px; padding: 6px 0; }
+.checklist-section > summary, .template-editor .checklist-section > summary { min-height: 44px; padding: 10px 0; }
+.question-block > summary[hidden] { display: none; }
+.list-panel .task-actions { margin-top: 6px; gap: 2px 8px; }
+.list-panel .task-actions .button { min-height: 40px; padding: 6px 8px; font-size: 12px; }
+@media (max-width: 760px) {
+ .list-panel, .template-editor > .list-panel { padding: 16px; }
+ .list-panel .panel-header { flex-wrap: wrap; }
+ .check-fields textarea, .compact-item .check-fields textarea.check-label { font-size: 16px; }
+ .list-panel .task-actions .button, .list-panel .panel-header > .button { min-height: 44px; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
 }
