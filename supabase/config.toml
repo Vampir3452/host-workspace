@@ -1,0 +1,4 @@
+[functions.google-calendar]
+# Function validates the bearer using Auth /user and the owner RPC itself.
+# Supports the current publishable-key gateway as well as legacy JWT keys.
+verify_jwt = false
