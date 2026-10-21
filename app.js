@@ -1,7 +1,7 @@
 import { CONFIG } from './config.js';
 import * as db from './lib/storage.js';
 import * as api from './lib/api.js';
-import { CATEGORIES, SCHEMA_VERSION, clone, uid, item, applyTemplate, cleanTitle, progress, localDate, defaultTemplates, seedWeddingTemplate, demoRecords, reconcileCalendar, scriptLink, validateBackup, restorePlan } from './lib/model.js';
+import { CATEGORIES, SCHEMA_VERSION, clone, sameContent, uid, item, applyTemplate, cleanTitle, progress, localDate, defaultTemplates, seedWeddingTemplate, demoRecords, reconcileCalendar, scriptLink, validateBackup, restorePlan } from './lib/model.js';
 
 const $ = selector => document.querySelector(selector);
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -109,10 +109,13 @@ async function performSync(includeCalendar) {
     for (const cloud of remote) {
       const local = record(cloud.id);
       if (!local) { const r = hydrate(cloud); state.records.push(r); persist(r, false); }
+      else if (local.conflict && sameContent(local.payload, cloud.payload)) {
+        local.version = cloud.version; local.dirty = false; delete local.conflict; persist(local, false);
+      }
       else if (cloud.version !== local.version) {
         const openEditor = state.selected === local.id && ['event', 'templates'].includes(state.route);
         if (local.dirty || openEditor) {
-          if (JSON.stringify(local.payload) === JSON.stringify(cloud.payload)) { local.version = cloud.version; local.dirty = false; delete local.conflict; }
+          if (sameContent(local.payload, cloud.payload)) { local.version = cloud.version; local.dirty = false; delete local.conflict; }
           else local.conflict = cloud;
         } else { Object.assign(local, hydrate(cloud)); delete local.conflict; }
         persist(local, false);
@@ -131,8 +134,10 @@ async function performSync(includeCalendar) {
       if (result.saved) {
         local.version = result.record.version;
         // Edits typed while the network request was in flight remain dirty.
-        local.dirty = JSON.stringify(local.payload) !== JSON.stringify(snapshot.payload);
+        local.dirty = !sameContent(local.payload, snapshot.payload);
         delete local.conflict;
+      } else if (result.record && sameContent(local.payload, result.record.payload)) {
+        local.version = result.record.version; local.dirty = false; delete local.conflict;
       } else { local.conflict = result.record || { id: local.id, kind: local.kind, version: 0, payload: null }; }
       persist(local, false);
     }
