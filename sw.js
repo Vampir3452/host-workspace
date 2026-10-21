@@ -1,10 +1,10 @@
 // Only the public application shell is cached. Account data lives in IndexedDB.
-const VERSION = 'dev-v5';
+const VERSION = 'dev-v6';
 const DEVELOPMENT = ['localhost', '127.0.0.1'].includes(self.location.hostname);
 const SCOPE = new URL(self.registration.scope).pathname;
 const CACHE_PREFIX = `zk-shell:${SCOPE}:`;
 const CACHE = `${CACHE_PREFIX}${VERSION}`;
-const FILES = ['index.html', 'styles.css', 'app.js', 'config.js', 'icon.svg', 'manifest.webmanifest', 'lib/model.js', 'lib/wedding-template.js', 'lib/storage.js', 'lib/api.js', 'lib/task-import.js', 'lib/rich-text.js', 'vendor/xlsx-0.20.3.mjs', 'vendor/SHEETJS-LICENSE.txt'];
+const FILES = ['index.html', 'styles.css', 'app.js', 'config.js', 'icon.svg', 'manifest.webmanifest', 'lib/model.js', 'lib/wedding-template.js', 'lib/storage.js', 'lib/api.js', 'lib/task-import.js', 'lib/rich-text.js', 'lib/change-history.js', 'vendor/xlsx-0.20.3.mjs', 'vendor/SHEETJS-LICENSE.txt'];
 const PATHS = new Set(FILES.map(file => new URL(file, self.registration.scope).pathname));
 
 async function publicShell(request, cacheKey) {
@@ -34,6 +34,10 @@ self.addEventListener('activate', event => {
     await Promise.all(keys.filter(key => key.startsWith(CACHE_PREFIX) && key !== CACHE).map(key => caches.delete(key)));
     await self.clients.claim();
   })());
+});
+self.addEventListener('message', event => {
+  if (event.data?.type === 'ACTIVATE_UPDATE') event.waitUntil(self.skipWaiting());
+  if (event.data?.type === 'CACHE_STATUS') event.ports?.[0]?.postMessage({ cache: CACHE, version: VERSION });
 });
 self.addEventListener('fetch', event => {
   const request = event.request;

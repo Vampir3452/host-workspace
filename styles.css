@@ -334,9 +334,24 @@ dialog::backdrop { background: #112c2b66; backdrop-filter: blur(3px); }
 .template-editor > .panel { padding: 20px 24px; }
 .template-editor .panel-header { margin-bottom: 10px; }
 .own-templates { margin-top: 20px; }
+.update-page { max-width: 720px; margin: 8vh auto; padding: 20px; line-height: 1.65; }
+.task-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.app-version { font-size: 11px; color: var(--muted); }
+.change-log { display: grid; gap: 12px; max-width: 900px; }
+.change-entry { padding: 22px; overflow-wrap: anywhere; }
+.change-entry > p { font-size: 13px; }
+.change-meta { display: flex; flex-wrap: wrap; gap: 8px 18px; color: var(--muted); font-size: 12px; }
+.change-title { min-height: 44px; padding: 8px 0; text-align: left; color: var(--forest); font-size: 17px; font-weight: 600; }
+.change-entry summary { cursor: pointer; min-height: 44px; padding: 10px 0; font-size: 13px; }
+.change-values { padding: 12px; margin-top: 8px; border: 1px solid var(--line); border-radius: 8px; font-size: 13px; }
+.change-values p { white-space: pre-wrap; }
+.change-values p > span { color: var(--muted); }
 .compact-item { padding: 3px 0; }
 .compact-item .check-line { gap: 9px; align-items: flex-start; }
 .compact-item .check-input { flex-shrink: 0; margin-top: 14px; }
+.compact-item .check-line { position: relative; }
+.check-hit { flex: 0 0 44px; min-height: 44px; display: grid; place-items: center; cursor: pointer; }
+.compact-item .check-hit .check-input { margin: 0; }
 .item-disclosure { min-width: 0; flex: 1; }
 .item-disclosure > summary { min-height: 44px; padding: 11px 4px; cursor: pointer; font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
 .item-title { font-weight: 500; }

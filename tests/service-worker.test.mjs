@@ -7,16 +7,29 @@ const worker = await readFile(new URL('../sw.js', import.meta.url), 'utf8');
 const workerVersion = worker.match(/const VERSION = '([^']+)'/)[1];
 function setup({ origin = 'https://example.github.io', offline = false } = {}) {
   const handlers = {}, matched = [], fetched = [], deleted = [], opened = [], written = [];
-  let claimed = false;
+  let claimed = false, activatedOnRequest = false;
   const address = request => typeof request === 'string' ? request : request.url || request.href;
   const cache = { addAll: async () => {}, match: async request => { matched.push(address(request)); return new Response('cached shell'); }, put: async (request, response) => { written.push({ url: address(request), body: await response.text() }); } };
   vm.runInNewContext(worker, {
-    self: { registration: { scope: `${origin}/workspace/` }, location: { origin, hostname: new URL(origin).hostname }, clients: { claim: async () => { claimed = true; } }, addEventListener: (type, fn) => { handlers[type] = fn; } },
+    self: { registration: { scope: `${origin}/workspace/` }, location: { origin, hostname: new URL(origin).hostname }, clients: { claim: async () => { claimed = true; } }, skipWaiting: async () => { activatedOnRequest = true; }, addEventListener: (type, fn) => { handlers[type] = fn; } },
     caches: { open: async name => { opened.push(name); return cache; }, keys: async () => ['zk-shell:/workspace/:old', 'zk-shell:/different/:old', 'unrelated'], delete: async name => { deleted.push(name); } },
     URL, Request, Response, fetch: async (request, options) => { fetched.push({ url: address(request), options }); if (offline) throw new TypeError('Network unavailable'); return new Response('network'); },
   });
-  return { handlers, matched, fetched, deleted, opened, written, claimed: () => claimed };
+  return { handlers, matched, fetched, deleted, opened, written, claimed: () => claimed, activatedOnRequest: () => activatedOnRequest };
 }
+test('new shell activates only after the explicit update message', async () => {
+  const state = setup(); let installing;
+  state.handlers.install({waitUntil:p=>{installing=p;}}); await installing;
+  assert.equal(state.activatedOnRequest(),false);
+  let activation; state.handlers.message({data:{type:'ACTIVATE_UPDATE'},waitUntil:p=>{activation=p;}}); await activation;
+  assert.equal(state.activatedOnRequest(),true);
+});
+test('cleanup can identify the current offline cache without exposing account data', () => {
+  const state = setup(); let response;
+  state.handlers.message({data:{type:'CACHE_STATUS'},ports:[{postMessage:value=>{response=value;}}]});
+  assert.equal(response.cache,`zk-shell:/workspace/:${workerVersion}`);assert.equal(response.version,workerVersion);
+  assert.deepEqual(Object.keys(response).sort(),['cache','version']);
+});
 function dispatch(state, url, { method = 'GET', mode = 'cors', headers = {} } = {}) {
   let promise;
   state.handlers.fetch({ request: { url, method, mode, headers: new Headers(headers) }, respondWith: p => { promise = p; } });
