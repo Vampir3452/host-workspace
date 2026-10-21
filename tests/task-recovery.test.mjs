@@ -1,6 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {emptyBody,item,clearTaskList,restoreTaskList,replaceTemplateTasks,validatePayload} from '../lib/model.js';
+import {emptyBody,item,clearTaskList,restoreTaskList,clearQuestionList,restoreQuestionList,replaceTemplateTasks,validatePayload} from '../lib/model.js';
+test('discussion clearing and recovery preserve answers, comments and all other event materials',()=>{
+ const body={...emptyBody(),notes:'Notes',questionnaires:'Forms',tasks:[item('Task')],questions:[{...item('Question'),answer:'Saved answer',comment:'Saved comment',done:true}]};
+ const cleared=clearQuestionList(body);assert.equal(cleared.questions.length,0);assert.equal(body.questions.length,1);
+ const restored=restoreQuestionList(cleared);assert.deepEqual(restored,body);
+ assert.equal(validatePayload('event',{source:{googleId:'a',title:'A',start:'2026-11-21',status:'confirmed'},body:cleared}),true);
+ cleared.questions.push(item('New'));assert.equal(restoreQuestionList(cleared).questions.length,2);
+});
 test('clearing and restoring tasks preserves notes, answers, annotations and completed task details',()=>{
  const body={...emptyBody(),notes:'Keep',questionnaires:'Keep too',questions:[{...item('Question'),answer:'Answer'}],tasks:[{...item('Task'),done:true,comment:'Detail'}]};
  const cleared=clearTaskList(body); assert.equal(cleared.tasks.length,0);assert.equal(cleared.questions[0].answer,'Answer');assert.equal(body.tasks.length,1);
