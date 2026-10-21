@@ -1,6 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {emptyBody,item,clearTaskList,restoreTaskList,clearQuestionList,restoreQuestionList,replaceTemplateTasks,validatePayload} from '../lib/model.js';
+import {emptyBody,item,clearTaskList,restoreTaskList,clearQuestionList,restoreQuestionList,discardRecoveredItems,replaceTemplateTasks,validatePayload} from '../lib/model.js';
+test('discarding a recovery list preserves current data and the other recovery list',()=>{
+ const body={...emptyBody(),notes:'Notes',tasks:[item('Current')],tasksRecovery:[item('Old task')],questionsRecovery:[{...item('Old question'),answer:'Answer'}]};
+ const next=discardRecoveredItems(body,'tasks');assert.equal(next.tasksRecovery,undefined);assert.deepEqual(next.tasks,body.tasks);assert.deepEqual(next.questionsRecovery,body.questionsRecovery);assert.equal(body.tasksRecovery.length,1);
+ assert.equal(discardRecoveredItems(next,'questions').questionsRecovery,undefined);assert.throws(()=>discardRecoveredItems(body,'notes'));
+});
 test('discussion clearing and recovery preserve answers, comments and all other event materials',()=>{
  const body={...emptyBody(),notes:'Notes',questionnaires:'Forms',tasks:[item('Task')],questions:[{...item('Question'),answer:'Saved answer',comment:'Saved comment',done:true}]};
  const cleared=clearQuestionList(body);assert.equal(cleared.questions.length,0);assert.equal(body.questions.length,1);

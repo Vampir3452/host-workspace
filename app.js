@@ -4,9 +4,9 @@ import * as api from './lib/api.js';
 import { parseTaskFile, downloadTaskWorkbook } from './lib/task-import.js';
 import { renderRichEditor, wireRichEditors } from './lib/rich-text.js';
 import { recordChanges, describeDevice } from './lib/change-history.js';
-import { CATEGORIES, SCHEMA_VERSION, clone, sameContent, uid, item, createTemplate, clearTaskList, restoreTaskList, clearQuestionList, restoreQuestionList, replaceTemplateTasks, applyTemplate, cleanTitle, progress, localDate, defaultTemplates, seedWeddingTemplate, demoRecords, reconcileCalendar, scriptLink, validateBackup, restorePlan } from './lib/model.js';
+import { CATEGORIES, SCHEMA_VERSION, clone, sameContent, uid, item, createTemplate, clearTaskList, restoreTaskList, clearQuestionList, restoreQuestionList, discardRecoveredItems, replaceTemplateTasks, applyTemplate, cleanTitle, progress, localDate, defaultTemplates, seedWeddingTemplate, demoRecords, reconcileCalendar, scriptLink, validateBackup, restorePlan } from './lib/model.js';
 
-const APP_VERSION = '0.4.1';
+const APP_VERSION = '0.4.2';
 const historyBaseline = new Map();
 const device = (() => {
   try {
@@ -273,10 +273,10 @@ function checklistTools(group) {
   return `<div class="checklist-tools">${button('toggle-items', 'Развернуть пункты', '', 'ghost', `data-group="${group}" aria-expanded="false"`)}${group === 'tasks' ? button('import-tasks', 'Импорт из Excel', 'upload', 'ghost') : ''}</div>`;
 }
 function taskActions(body) {
-  return `<div class="task-actions">${body.tasks.length ? button('clear-tasks','Очистить все задачи','trash','ghost') : ''}${body.tasksRecovery?.length ? button('restore-tasks',`Вернуть задачи (${body.tasksRecovery.length})`,'back','secondary') : ''}</div>`;
+  return `<div class="task-actions">${body.tasks.length ? button('clear-tasks','Очистить все задачи','trash','ghost') : ''}${body.tasksRecovery?.length ? `${button('restore-tasks',`Вернуть задачи (${body.tasksRecovery.length})`,'back','secondary')}${button('discard-recovered','Удалить удалённые задачи','trash','ghost','data-group="tasks"')}` : ''}</div>`;
 }
 function questionActions(body) {
-  return `<div class="task-actions">${body.questions.length ? button('clear-questions','Очистить все вопросы','trash','ghost') : ''}${body.questionsRecovery?.length ? button('restore-questions',`Вернуть вопросы (${body.questionsRecovery.length})`,'back','secondary') : ''}</div>`;
+  return `<div class="task-actions">${body.questions.length ? button('clear-questions','Очистить все вопросы','trash','ghost') : ''}${body.questionsRecovery?.length ? `${button('restore-questions',`Вернуть вопросы (${body.questionsRecovery.length})`,'back','secondary')}${button('discard-recovered','Удалить удалённые вопросы','trash','ghost','data-group="questions"')}` : ''}</div>`;
 }
 function eventCategory(category) {
   return `<label class="field">Тип мероприятия<select id="event-category" data-field="category">${Object.entries(CATEGORIES).map(([id,label])=>`<option value="${id}" ${category === id ? 'selected' : ''}>${label}</option>`).join('')}</select></label>`;
@@ -461,6 +461,15 @@ document.addEventListener('click', safeAction(async e => {
   if (action === 'clear-tasks') {
     const r = current(); if (r?.kind !== 'event') return;
     modal('Очистить задачи мероприятия?', `<p>Будут убраны все задачи подготовки: <strong>${r.payload.body.tasks.length}</strong>. Их отметки и комментарии сохранятся для возврата. Вопросы, ответы, заметки и анкеты останутся.</p>`, `${button('close-modal','Отмена','','secondary')}${button('confirm-clear-tasks','Очистить все задачи','trash','danger')}`); return;
+  }
+  if (action === 'discard-recovered') {
+    const r = current(), group = el.dataset.group; if (r?.kind !== 'event' || !['questions','tasks'].includes(group)) return;
+    const count = r.payload.body[`${group}Recovery`]?.length || 0;
+    modal('Удалить сохранённые пункты навсегда?', `<p>Из запаса для восстановления будет удалено пунктов: <strong>${count}</strong>${group === 'questions' ? ', вместе с их ответами и комментариями' : ''}. Кнопка возврата исчезнет. Отменить это действие можно будет только восстановлением ранее скачанной резервной копии.</p><p>Текущие вопросы, задачи, заметки и анкеты останутся.</p>`, `${button('close-modal','Отмена','','secondary')}${button('confirm-discard-recovered','Удалить навсегда','trash','danger',`data-group="${group}"`)}`); return;
+  }
+  if (action === 'confirm-discard-recovered') {
+    const r = current(), group = el.dataset.group; if (r?.kind !== 'event' || !['questions','tasks'].includes(group)) return;
+    r.payload.body = discardRecoveredItems(r.payload.body,group); changed(r); closeModal(); render(); toast('Запас для восстановления очищен.'); return;
   }
   if (action === 'clear-questions') {
     const r = current(); if (r?.kind !== 'event') return;
