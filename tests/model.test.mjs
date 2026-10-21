@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { orderStatus, cleanTitle, emptyBody, item, applyTemplate, calendarSource, reconcileCalendar, scriptLink, progress, localDate, defaultTemplates, validatePayload, validateBackup, restorePlan, demoRecords } from '../lib/model.js';
+import { orderStatus, cleanTitle, emptyBody, item, applyTemplate, calendarSource, reconcileCalendar, scriptLink, progress, localDate, defaultTemplates, seedWeddingTemplate, validatePayload, validateBackup, restorePlan, demoRecords } from '../lib/model.js';
 
 const google = (id = 'abc', overrides = {}) => ({ id, summary: 'Заказ: Свадьба', start: { date: '2026-11-21' }, end: { date: '2026-11-22' }, updated: '2026-10-21T10:00:00Z', ...overrides });
 const eventRecord = (event = google()) => ({ id: `event:${event.id}`, kind: 'event', version: 3, dirty: false, payload: { source: calendarSource(event), body: emptyBody() } });
@@ -48,15 +48,85 @@ test('unchanged calendar snapshot does not mark saved event dirty', () => {
 test('template adds independent fresh items and never overwrites existing answers', () => {
   const body = emptyBody();
   body.notes = 'Заметки'; body.questions.push({ ...item('Старый вопрос'), answer: 'Готовый ответ', done: true });
-  const template = { id: 'template:wedding', category: 'wedding', questions: [item('Новый вопрос')], tasks: [item('Проверить звук')] };
+  const template = { id: 'template:wedding', category: 'wedding',
+    questions: [{ ...item('Новый вопрос'), section: 'Церемония', hint: 'Обсудить варианты выхода', answer: 'Ответ шаблона', comment: 'Старый комментарий', done: true }],
+    tasks: [{ ...item('Проверить звук'), section: 'Перед выездом', hint: 'Микрофон и кабели', answer: 'Старое значение', comment: 'Проверено', done: true }] };
+  const before = structuredClone(template);
   const first = applyTemplate(body, template), second = applyTemplate(body, template);
   assert.equal(first.questions[0].answer, 'Готовый ответ');
   assert.equal(first.notes, 'Заметки');
   assert.equal(first.questions[1].done, false);
+  for (const copied of [first.questions[1], first.tasks[0]]) {
+    assert.equal(copied.answer, ''); assert.equal(copied.comment, ''); assert.equal(copied.done, false);
+  }
+  assert.equal(first.questions[1].section, 'Церемония');
+  assert.equal(first.questions[1].hint, 'Обсудить варианты выхода');
+  assert.equal(first.tasks[0].section, 'Перед выездом');
+  assert.equal(first.tasks[0].hint, 'Микрофон и кабели');
+  assert.notEqual(first.questions[1].id, template.questions[0].id);
+  assert.notEqual(first.tasks[0].id, template.tasks[0].id);
   assert.notEqual(first.questions[1].id, second.questions[1].id);
+  assert.notEqual(first.tasks[0].id, second.tasks[0].id);
   first.questions[0].answer = 'Изменён'; first.tasks[0].label = 'Другое';
   assert.equal(body.questions[0].answer, 'Готовый ответ');
   assert.equal(template.tasks[0].label, 'Проверить звук');
+  assert.deepEqual(template, before);
+});
+
+test('default wedding template is complete, independent and stable across calls', () => {
+  const first = defaultTemplates(), second = defaultTemplates();
+  const wedding = first.find(x => x.id === 'template:wedding');
+  assert.equal(wedding.payload.contentVersion, 1);
+  assert.ok(wedding.payload.questions.length > 0 && wedding.payload.tasks.length > 0);
+  assert.ok([...wedding.payload.questions, ...wedding.payload.tasks].every(x =>
+    x.id && x.label && x.section && x.hint && x.answer === '' && x.comment === '' && x.done === false));
+  assert.deepEqual(first.map(x => x.payload), second.map(x => x.payload));
+  assert.ok(first.filter(x => x.id !== 'template:wedding').every(x => !x.payload.questions.length && !x.payload.tasks.length));
+  wedding.payload.questions[0].label = 'Моя правка';
+  assert.notEqual(second[0].payload.questions[0].label, 'Моя правка');
+  assert.notEqual(defaultTemplates()[0].payload.questions[0].label, 'Моя правка');
+});
+
+test('legacy blank wedding template is seeded once without mutating its saved record', () => {
+  const legacy = { id: 'template:wedding', kind: 'template', version: 7, dirty: false,
+    localUpdated: '2026-01-01T00:00:00Z', payload: { name: 'Свадьба', category: 'wedding', questions: [], tasks: [] } };
+  const before = structuredClone(legacy), seeded = seedWeddingTemplate(legacy);
+  assert.deepEqual(legacy, before);
+  assert.equal(seeded.id, legacy.id); assert.equal(seeded.version, 7);
+  assert.equal(seeded.dirty, true);
+  assert.notEqual(seeded.localUpdated, legacy.localUpdated);
+  assert.deepEqual(seeded.payload, defaultTemplates()[0].payload);
+  assert.equal(seedWeddingTemplate(seeded), null);
+  seeded.payload.questions = []; seeded.payload.tasks = [];
+  assert.equal(seedWeddingTemplate(seeded), null, 'intentional clearing must not be reseeded');
+  for (const changes of [
+    { id: 'template:birthday' }, { kind: 'event' }, { conflict: { payload: {} } },
+    { payload: { ...legacy.payload, category: 'birthday' } },
+    { payload: { ...legacy.payload, questions: [item('Мой вопрос')] } },
+    { payload: { ...legacy.payload, tasks: [item('Моя задача')] } },
+    { payload: { ...legacy.payload, contentVersion: 2 } },
+  ]) assert.equal(seedWeddingTemplate({ ...legacy, ...changes }), null);
+  assert.equal(seedWeddingTemplate(null), null);
+});
+
+test('backup retains optional sections and hints while accepting older checklist items', () => {
+  const event = eventRecord();
+  event.payload.body.questions = [item('Старый вопрос'), { ...item('Новый вопрос'), section: 'Церемония', hint: 'Варианты' }];
+  event.payload.body.tasks = [{ ...item('Подготовить'), section: 'Выезд', hint: 'По согласованной программе' }];
+  const restored = validateBackup(JSON.parse(JSON.stringify(backup([event, ...defaultTemplates()]))), 'calendar', 'owner@example.com');
+  assert.deepEqual(restored[0].payload.body, event.payload.body);
+  for (const field of ['section', 'hint']) {
+    for (const kind of ['event', 'template']) {
+      const record = kind === 'event' ? structuredClone(event) : defaultTemplates()[0];
+      const payload = kind === 'event' ? record.payload.body : record.payload;
+      payload.questions[0][field] = { invalid: true };
+      assert.equal(validatePayload(kind, record.payload), false, `${kind}: ${field}`);
+    }
+  }
+  for (const contentVersion of [-1, 1.5, '1', null]) {
+    const record = defaultTemplates()[0]; record.payload.contentVersion = contentVersion;
+    assert.equal(validatePayload('template', record.payload), false);
+  }
 });
 
 test('date mapping respects Yekaterinburg and preserves all-day dates', () => {
@@ -133,10 +203,12 @@ test('restore preview separates additions and changes, ignoring unchanged record
   assert.deepEqual(preview.changed.map(x => x.id), ['event:abc']);
 });
 
-test('demo data is synthetic, structurally valid and includes three empty starter templates', () => {
+test('demo data is synthetic, structurally valid and includes the wedding starter template', () => {
   const records = demoRecords();
   assert.equal(records.filter(x => x.kind === 'event').length, 3);
   assert.ok(records.every(x => validatePayload(x.kind, x.payload)));
   assert.ok(records.filter(x => x.kind === 'event').every(x => x.id.startsWith('event:demo-')));
-  assert.ok(records.filter(x => x.kind === 'template').every(x => !x.payload.questions.length && !x.payload.tasks.length));
+  const templates = records.filter(x => x.kind === 'template');
+  assert.deepEqual(templates.find(x => x.id === 'template:wedding').payload, defaultTemplates()[0].payload);
+  assert.ok(templates.filter(x => x.id !== 'template:wedding').every(x => !x.payload.questions.length && !x.payload.tasks.length));
 });

@@ -4,6 +4,7 @@ import vm from 'node:vm';
 import { readFile } from 'node:fs/promises';
 
 const worker = await readFile(new URL('../sw.js', import.meta.url), 'utf8');
+const workerVersion = worker.match(/const VERSION = '([^']+)'/)[1];
 function setup({ origin = 'https://example.github.io', offline = false } = {}) {
   const handlers = {}, matched = [], fetched = [], deleted = [], opened = [], written = [];
   let claimed = false;
@@ -37,7 +38,7 @@ test('offline navigation with an OAuth code returns clean shell without storing 
 test('worker uses its own versioned shell and leaves other site caches alone', async () => {
   const state = setup();
   await dispatch(state, 'https://example.github.io/workspace/lib/model.js');
-  assert.deepEqual(state.opened, ['zk-shell:/workspace/:dev-v2']);
+  assert.deepEqual(state.opened, [`zk-shell:/workspace/:${workerVersion}`]);
   let activation;
   state.handlers.activate({ waitUntil: p => { activation = p; } });
   await activation;
