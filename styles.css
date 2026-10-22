@@ -647,3 +647,12 @@ dialog::backdrop { background: #112c2b66; backdrop-filter: blur(3px); }
   textarea, input { border: 0 !important; background: transparent !important; }
   body { background: white; }
 }
+.codex-setup, .codex-chat { padding: 22px; margin-bottom: 18px; }
+.codex-setup h2 { margin: 0 0 10px; }
+.codex-setup #codex-status { margin-left: 12px; color: var(--muted); font-size: 12px; }
+.codex-chat #codex-messages { display: grid; gap: 12px; margin: 18px 0; }
+.codex-user-message, .codex-answer { max-width: 88%; padding: 12px 15px; border-radius: 12px; white-space: pre-wrap; line-height: 1.55; }
+.codex-user-message { justify-self: end; background: #e9efe4; }
+.codex-answer { background: #f4f3ef; }
+.codex-chat form { display: grid; gap: 10px; }
+.codex-chat textarea { width: 100%; }
