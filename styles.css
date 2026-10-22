@@ -648,3 +648,4 @@ dialog::backdrop { background: #112c2b66; backdrop-filter: blur(3px); }
   body { background: white; }
 }
 
+.eyebrow, .subtitle, .form-help, .section-label { display: none !important; }
