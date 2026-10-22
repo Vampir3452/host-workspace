@@ -8,7 +8,7 @@
 - Таблицы, RLS, список владельцев и атомарная запись с номером версии созданы через SQL Editor. Анонимный запрос к данным возвращает 401.
 - Функция `google-calendar` развёрнута. Legacy-only gateway JWT отключён; функция проверяет токен через Auth /user и доступ владельца через RPC. CORS для опубликованного origin возвращает 204.
 - Google provider включён. Site URL и разрешённый redirect — точный адрес опубликованного сайта.
-- OAuth client «За кулисами — личный кабинет» создан в существующем Google Cloud проекте Calendar-NGI. Calendar API уже был включён.
+- OAuth client «Let’s Go! — личный кабинет» создан в существующем Google Cloud проекте Calendar-NGI. Calendar API уже был включён.
 - Client Secret хранится только в настройках Google provider и серверных Secrets Supabase. В исходниках и сборке его нет.
 - `ALLOWED_ORIGINS`: опубликованный GitHub Pages origin и локальные адреса разработки.
 - Google OAuth пока в режиме Testing. После истечения разрешения потребуется переподключение; Production и необходимые настройки Branding — отдельный шаг перед длительным использованием.

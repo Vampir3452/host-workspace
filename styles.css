@@ -649,3 +649,11 @@ dialog::backdrop { background: #112c2b66; backdrop-filter: blur(3px); }
 }
 
 .eyebrow, .subtitle, .form-help, .section-label { display: none !important; }
+.event-quick-info { margin-bottom: 22px; }
+.event-info-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px 20px; margin: 16px 0; }
+.event-info-grid div { min-width: 0; }
+.event-info-grid dt { color: var(--muted); font-size: 13px; }
+.event-info-grid dd { margin: 4px 0 0; overflow-wrap: anywhere; font-weight: 500; }
+.event-cost-team { display: grid; grid-template-columns: minmax(160px, 240px) minmax(240px, 1fr); gap: 16px; align-items: start; }
+.event-cost-team .field { margin: 0; }
+@media (max-width: 600px) { .event-info-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .event-cost-team { grid-template-columns: 1fr; gap: 10px; } }
