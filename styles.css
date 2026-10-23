@@ -674,4 +674,15 @@ dialog::backdrop { background: #112c2b66; backdrop-filter: blur(3px); }
 .event-cost-team textarea[data-field="team"] { min-height: 44px; height: 44px; }
 .event-info-grid input { min-width: 0; width: 100%; }
 .question-block > summary[hidden], #preparation-contents > summary[hidden] { display: none; }
+.calendar-layout { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+.calendar-layout > .upcoming-panel { display: block; padding: 0; }
+.upcoming-panel > h2 { margin: 0 0 10px; font-size: 16px; }
+.upcoming-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.upcoming-list .event-preview { padding: 12px; gap: 6px; border: 1px solid var(--line); border-radius: 10px; background: white; align-content: start; }
+.upcoming-list > .empty-state { grid-column: 1 / -1; min-height: 100px; padding: 12px; }
+@media (max-width: 600px) {
+  .upcoming-list { display: flex; overflow-x: auto; gap: 8px; padding-bottom: 4px; }
+  .upcoming-list .event-preview { flex: 0 0 210px; }
+  .upcoming-list > .empty-state { flex: 1; }
+}
 @media (max-width: 600px) { .event-quick-info { padding: 16px; } .event-info-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 12px; } .event-cost-team { grid-template-columns: 1fr; gap: 10px; } }
