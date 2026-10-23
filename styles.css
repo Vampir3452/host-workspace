@@ -76,7 +76,9 @@ strong { font-weight: 600; }
 .interface-tools { display: flex; gap: 6px; margin-left: auto; flex-wrap: wrap; }
 .interface-tools .interface-update { white-space: nowrap; padding: 6px 9px; min-height: 36px; font-size: 12px; gap: 5px; }
 .interface-tools .interface-update svg { width: 14px; height: 14px; }
+.list-panel .task-actions .button, .list-panel .checklist-tools .button, .list-panel .panel-header .button { padding: 6px 9px; min-height: 32px; font-size: 12px; gap: 5px; }
 @media (pointer: coarse) { .interface-tools .interface-update { min-height: 44px; } }
+@media (pointer: coarse) { .list-panel .button { min-height: 44px; } }
 @media (max-width: 600px) {
   .topbar { flex-wrap: wrap; }
   .topbar > .top-actions { flex: 1 1 100%; justify-content: space-between; }
@@ -343,15 +345,19 @@ dialog::backdrop { background: #112c2b66; backdrop-filter: blur(3px); }
 .update-page { max-width: 720px; margin: 8vh auto; padding: 20px; line-height: 1.65; }
 .task-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .app-version { font-size: 11px; color: var(--muted); }
-.change-log { display: grid; gap: 12px; max-width: 900px; }
-.change-entry { padding: 22px; overflow-wrap: anywhere; }
-.change-entry > p { font-size: 13px; }
-.change-meta { display: flex; flex-wrap: wrap; gap: 8px 18px; color: var(--muted); font-size: 12px; }
-.change-title { min-height: 44px; padding: 8px 0; text-align: left; color: var(--forest); font-size: 17px; font-weight: 600; }
-.change-entry summary { cursor: pointer; min-height: 44px; padding: 10px 0; font-size: 13px; }
-.change-values { padding: 12px; margin-top: 8px; border: 1px solid var(--line); border-radius: 8px; font-size: 13px; }
-.change-values p { white-space: pre-wrap; }
+.change-log { max-width: 1000px; border: 1px solid var(--line); border-radius: 12px; background: white; overflow: hidden; }
+.change-entry { padding: 10px 16px; overflow-wrap: anywhere; border-bottom: 1px solid var(--line); }
+.change-entry:last-child { border-bottom: 0; }
+.change-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px 16px; }
+.change-meta { display: flex; flex-wrap: wrap; gap: 4px 12px; color: var(--muted); font-size: 12px; }
+.change-title { min-height: 32px; padding: 3px 0; text-align: left; color: var(--forest); font-size: 14px; font-weight: 600; }
+.change-entry summary { cursor: pointer; min-height: 30px; padding: 4px 0; font-size: 13px; }
+.change-values { padding: 8px 0; border-top: 1px solid var(--line); font-size: 13px; display: grid; gap: 4px; }
+.change-values p { margin: 0; white-space: pre-wrap; }
 .change-values p > span { color: var(--muted); }
+.change-tools .button { min-height: 32px; padding: 6px 9px; font-size: 12px; }
+@media (max-width: 600px) { .change-row { flex-wrap: wrap; gap: 2px; } .change-meta { width: 100%; } .change-entry { padding: 8px 12px; } }
+@media (pointer: coarse) { .change-title, .change-entry summary, .change-tools .button { min-height: 44px; } }
 .compact-item { padding: 3px 0; }
 .compact-item .check-line { gap: 9px; align-items: flex-start; }
 .compact-item .check-input { flex-shrink: 0; margin-top: 14px; }
@@ -658,6 +664,8 @@ dialog::backdrop { background: #112c2b66; backdrop-filter: blur(3px); }
 .event-info-grid div { min-width: 0; }
 .event-info-grid dt { color: var(--muted); font-size: 13px; }
 .event-info-grid dd { margin: 4px 0 0; overflow-wrap: anywhere; font-weight: 500; }
-.event-cost-team { display: grid; grid-template-columns: minmax(140px, 210px) minmax(220px, 1fr); gap: 12px; align-items: start; }
+.event-cost-team { display: grid; grid-template-columns: minmax(110px, 180px) minmax(110px, 180px) minmax(180px, 1fr); gap: 12px; align-items: start; }
 .event-cost-team .field { margin: 0; }
+.event-cost-team textarea[data-field="team"] { min-height: 44px; height: 44px; }
+.event-info-grid input { min-width: 0; width: 100%; }
 @media (max-width: 600px) { .event-quick-info { padding: 16px; } .event-info-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 12px; } .event-cost-team { grid-template-columns: 1fr; gap: 10px; } }

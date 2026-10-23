@@ -6,7 +6,7 @@ import { renderRichEditor, wireRichEditors } from './lib/rich-text.js';
 import { recordChanges, describeDevice } from './lib/change-history.js';
 import { CATEGORIES, SCHEMA_VERSION, clone, sameContent, uid, item, createTemplate, clearTaskList, restoreTaskList, clearQuestionList, restoreQuestionList, discardRecoveredItems, replaceTemplateTasks, applyTemplate, cleanTitle, progress, localDate, defaultTemplates, seedWeddingTemplate, demoRecords, reconcileCalendar, scriptLink, validateBackup, restorePlan } from './lib/model.js';
 
-const APP_VERSION = '0.4.10';
+const APP_VERSION = '0.4.11';
 const historyBaseline = new Map();
 const device = (() => {
   try {
@@ -210,6 +210,8 @@ function render() {
   else content.innerHTML = calendarView(state.route === 'archive');
   for (const el of document.querySelectorAll('[data-section-key]')) if (sectionStates.has(el.dataset.sectionKey)) el.open = sectionStates.get(el.dataset.sectionKey);
   renderedEditorKey = editorKey;
+  const preparationToggle = document.querySelector('[data-action="toggle-preparation"]'), preparation = document.querySelector('#preparation-contents');
+  if (preparationToggle && preparation) { preparationToggle.setAttribute('aria-expanded', String(preparation.open)); preparationToggle.querySelector('span').textContent = preparation.open ? 'Скрыть задачи' : 'Показать задачи'; }
   const discussionToggle = document.querySelector('[data-action="toggle-discussion"]'), discussion = document.querySelector('#discussion-contents');
   if (discussionToggle && discussion) { discussionToggle.setAttribute('aria-expanded',String(discussion.open)); discussionToggle.querySelector('span').textContent = discussion.open ? 'Скрыть вопросы' : 'Показать вопросы'; }
   scheduleChecklistFit();
@@ -222,7 +224,7 @@ function filteredEvents(archive = false) {
     const s = r.payload.source, b = r.payload.body, past = s.allDay && s.end ? localDate(s.end) <= today : localDate(s.end || s.start) < today;
     return (archive ? past || s.status === 'deleted' : !past && s.status !== 'deleted')
       && (state.filter === 'all' || s.status === state.filter || b.category === state.filter)
-      && `${s.title} ${s.location || ''} ${b.description} ${b.notes}`.toLowerCase().includes(state.query.toLowerCase());
+      && `${s.title} ${b.venue || s.location || ''} ${b.description} ${b.notes}`.toLowerCase().includes(state.query.toLowerCase());
   }).sort((a, b) => a.payload.source.start.localeCompare(b.payload.source.start));
 }
 function eventRow(r) {
@@ -261,7 +263,7 @@ function eventView() {
   const r = current(); if (!r) return emptyState('Карточка не найдена', 'Вернись к списку мероприятий.');
   const { source: s, body: b } = r.payload, p = progress(b);
   const eventTime = s.allDay ? 'Время не указано' : fmt(s.start, { hour: '2-digit', minute: '2-digit' }) + (s.end ? ' — ' + fmt(s.end, { hour: '2-digit', minute: '2-digit' }) : '');
-  return `<div class="page-heading event-heading"><div>${button('back-calendar', 'Все мероприятия', 'back', 'ghost')}<h1>${esc(cleanTitle(s.title))}</h1></div>${badge(s.status)}</div>${s.status === 'deleted' ? '<p class="notice">Событие удалено из Google Календаря. Все материалы подготовки сохранены.</p>' : ''}<section class="panel event-quick-info"><h2>Краткая информация</h2><dl class="event-info-grid"><div><dt>Дата</dt><dd>${esc(fmt(s.start, { day: 'numeric', month: 'long', year: 'numeric' }))}</dd></div><div><dt>Место</dt><dd>${esc(s.location || 'Не указано')}</dd></div><div><dt>Время</dt><dd>${esc(eventTime)}</dd></div></dl><div class="event-cost-team">${field('Общая стоимость, ₽', b.totalCost || '', 'totalCost', {input:'number',attrs:'min="0" step="100" inputmode="decimal"'})}${field('Состав команды', b.team || '', 'team', {placeholder:'Например: ведущий, DJ, координатор',rows:2})}</div></section><div class="editor-layout"><div class="editor-main"><section class="panel">${editorHeading('01', 'Быстрые заметки', 'Твой блокнот для звонков, встреч и внезапных идей')}${renderRichEditor('notes', 'Заметки', b.notes, b.notesHtml, {className:'notebook-field'})}</section><section class="panel">${editorHeading('02', 'О мероприятии', 'Контекст, пожелания и важные детали')}${eventCategory(b.category)}${renderRichEditor('description', 'Описание', b.description, b.descriptionHtml)}${b.category === 'wedding' ? field('Анкеты', b.questionnaires || '', 'questionnaires', {placeholder:'Вставь сюда текст анкет молодожёнов…',rows:8,class:'questionnaires-field'}) : ''}${s.calendarDescription ? `<details class="calendar-description"><summary>Исходное описание из Google Календаря</summary><p class="plain-text">${esc(s.calendarDescription)}</p></details>` : ''}</section><section class="panel list-panel">${discussionHeading(b)}${eventQuestions(b)}${questionActions(b)}</section><section class="panel list-panel">${editorHeading('04', 'Подготовка', '', `<span class="section-progress">${b.tasks.filter(x => x.done).length}/${b.tasks.length}</span>`)}${checklistTools('tasks')}<div class="checklist">${b.tasks.length ? renderChecklist(b.tasks, 'tasks') : ''}</div>${taskActions(b)}</section><section class="panel">${editorHeading('05', 'Конечный сценарий', 'Основная версия — в Google Документах')}${field('Ссылка на Google Документ', b.scriptUrl, 'scriptUrl', { input: 'url', placeholder: 'https://docs.google.com/document/d/…', attrs: 'aria-describedby="script-help"' })}<p id="script-help" class="form-help">Чтобы открыть сценарий без интернета, заранее настрой офлайн-доступ в Google Документах.</p><div id="script-open">${scriptAction(b.scriptUrl)}</div></section></div><aside class="editor-aside"><section class="panel"><div class="summary-progress"><strong id="progress-percent">${p.percent}%</strong><span>шаг за шагом</span></div><progress id="event-progress" value="${p.percent}" max="100" aria-label="Готовность мероприятия"></progress></section><section class="panel template-picker"><h3>${esc(CATEGORIES[b.category])}</h3>${button('choose-template', b.templateId ? 'Добавить из шаблона' : 'Выбрать шаблон', 'templates', 'secondary')}</section><section class="notice">${icon('check')}<p id="offline-ready">Сохранено для работы на этом устройстве. Для первого открытия на другом устройстве нужен интернет.</p></section></aside></div>`;
+  return `<div class="page-heading event-heading"><div>${button('back-calendar', 'Все мероприятия', 'back', 'ghost')}<h1>${esc(cleanTitle(s.title))}</h1></div>${badge(s.status)}</div>${s.status === 'deleted' ? '<p class="notice">Событие удалено из Google Календаря. Все материалы подготовки сохранены.</p>' : ''}<section class="panel event-quick-info"><h2>Краткая информация</h2><dl class="event-info-grid"><div><dt>Дата</dt><dd>${esc(fmt(s.start, { day: 'numeric', month: 'long', year: 'numeric' }))}</dd></div><div><dt><label for="f-venue">Место</label></dt><dd><input id="f-venue" data-field="venue" type="text" value="${esc(b.venue || s.location || '')}" placeholder="Место / площадка"></dd></div><div><dt>Время</dt><dd>${esc(eventTime)}</dd></div></dl><div class="event-cost-team">${field('Общая стоимость, ₽', b.totalCost || '', 'totalCost', {input:'number',attrs:'min="0" step="100" inputmode="decimal"'})}${field('Предоплата, ₽', b.prepayment || '', 'prepayment', {input:'number',attrs:'min="0" step="100" inputmode="decimal"'})}${field('Состав команды', b.team || '', 'team', {placeholder:'Например: ведущий, DJ, координатор',rows:2})}</div></section><div class="editor-layout"><div class="editor-main"><section class="panel">${editorHeading('01', 'О мероприятии', 'Контекст, пожелания и важные детали')}${renderRichEditor('description', 'Описание', b.description, b.descriptionHtml)}${b.category === 'wedding' ? field('Анкеты', b.questionnaires || '', 'questionnaires', {placeholder:'Вставь сюда текст анкет молодожёнов…',rows:8,class:'questionnaires-field'}) : ''}${s.calendarDescription ? `<details class="calendar-description"><summary>Исходное описание из Google Календаря</summary><p class="plain-text">${esc(s.calendarDescription)}</p></details>` : ''}</section><section class="panel list-panel">${discussionHeading(b)}${eventQuestions(b)}${questionActions(b)}</section><section class="panel list-panel">${editorHeading('03', 'Подготовка', '', `<span class="section-progress">${b.tasks.filter(x => x.done).length}/${b.tasks.length}</span>${button('toggle-preparation','Скрыть задачи','','ghost','aria-controls="preparation-contents" aria-expanded="true"')}`)}<details id="preparation-contents" data-section-key="preparation-block" open><summary hidden>Задачи подготовки</summary>${checklistTools('tasks')}<div class="checklist">${b.tasks.length ? renderChecklist(b.tasks, 'tasks') : ''}</div>${taskActions(b)}</details></section><section class="panel">${editorHeading('04', 'Конечный сценарий', 'Основная версия — в Google Документах')}${field('Ссылка на Google Документ', b.scriptUrl, 'scriptUrl', { input: 'url', placeholder: 'https://docs.google.com/document/d/…', attrs: 'aria-describedby="script-help"' })}<p id="script-help" class="form-help">Чтобы открыть сценарий без интернета, заранее настрой офлайн-доступ в Google Документах.</p><div id="script-open">${scriptAction(b.scriptUrl)}</div></section></div><aside class="editor-aside"><section class="panel"><div class="summary-progress"><strong id="progress-percent">${p.percent}%</strong><span>шаг за шагом</span></div><progress id="event-progress" value="${p.percent}" max="100" aria-label="Готовность мероприятия"></progress></section><section class="panel template-picker">${eventCategory(b.category)}${button('choose-template', b.templateId ? 'Добавить из шаблона' : 'Выбрать шаблон', 'templates', 'secondary')}</section><section class="notice">${icon('check')}<p id="offline-ready">Сохранено для работы на этом устройстве. Для первого открытия на другом устройстве нужен интернет.</p></section></aside></div>`;
 }
 function scriptAction(value) {
   const url = scriptLink(value);
@@ -270,7 +272,7 @@ function scriptAction(value) {
 function checklistItem(x, group, template = false) {
   const id = `${group}-${x.id}`;
   const attrs = name => `data-item-field="${name}" data-group="${group}" data-id="${esc(x.id)}"`;
-  const editor = `<details class="item-editor" data-section-key="edit:${esc(id)}"><summary>Изменить</summary><div class="item-edit-fields"><label class="field">${group === 'questions' ? 'Текст вопроса' : 'Название задачи'}<textarea rows="1" class="check-label" aria-label="${group === 'questions' ? 'Вопрос' : 'Задача'}" ${attrs('label')}>${esc(x.label)}</textarea></label><label class="field">ПодскаLGа<textarea aria-label="ПодскаLGа к пункту" rows="1" ${attrs('hint')}>${esc(x.hint)}</textarea></label><label class="field">Раздел<input aria-label="Раздел пункта" ${attrs('section')} value="${esc(x.section)}" placeholder="Без раздела"></label></div></details>`;
+  const editor = `<details class="item-editor" data-section-key="edit:${esc(id)}"><summary>Изменить</summary><div class="item-edit-fields"><label class="field">${group === 'questions' ? 'Текст вопроса' : 'Название задачи'}<textarea rows="1" class="check-label" aria-label="${group === 'questions' ? 'Вопрос' : 'Задача'}" ${attrs('label')}>${esc(x.label)}</textarea></label><label class="field">Подсказка<textarea aria-label="Подсказка к пункту" rows="1" ${attrs('hint')}>${esc(x.hint)}</textarea></label><label class="field">Раздел<input aria-label="Раздел пункта" ${attrs('section')} value="${esc(x.section)}" placeholder="Без раздела"></label></div></details>`;
   return `<div class="check-item compact-item ${x.done ? 'completed' : ''}" data-item="${esc(x.id)}"><div class="check-line">${!template ? `<label class="check-hit"><input class="check-input" type="checkbox" id="done-${id}" data-check="${group}" data-id="${esc(x.id)}" ${x.done ? 'checked' : ''} aria-label="${group === 'questions' ? 'Обсуждено' : 'Готово'}: ${esc(x.label)}"></label>` : ''}<details class="item-disclosure" data-section-key="item:${esc(id)}"><summary><span class="item-title">${esc(x.label || (group === 'questions' ? 'Новый вопрос' : 'Новая задача'))}</span>${!template && group === 'questions' ? `<span class="answer-preview">${x.answer ? 'Ответ записан' : ''}</span>` : ''}</summary><div class="check-fields">${x.hint ? `<p class="item-hint">${esc(x.hint)}</p>` : ''}${!template && group === 'questions' ? `<label class="field answer-field" for="answer-${id}"><span>Ответ</span><textarea rows="1" id="answer-${id}" class="answer" ${attrs('answer')} placeholder="Ответ заказчика">${esc(x.answer)}</textarea></label>` : ''}<div class="item-actions">${!template && group === 'tasks' ? `<details class="item-comment" ${x.comment ? 'open' : ''} data-section-key="comment:${esc(id)}"><summary>Комментарий</summary><textarea aria-label="Комментарий к пункту" rows="1" class="comment" ${attrs('comment')}>${esc(x.comment)}</textarea></details>` : ''}${editor}${iconButton('remove-item','Удалить пункт','trash',`data-group="${group}" data-id="${esc(x.id)}"`)}</div></div></details></div></div>`;
 }
 let checklistFitFrame, checklistFitTarget;
@@ -296,7 +298,7 @@ document.addEventListener('toggle', e => {
 }, true);
 window.addEventListener('resize',()=>scheduleChecklistFit());
 function discussionHeading(body) {
-  return editorHeading('03','Обсуждение мероприятия','',`<span class="section-progress">${body.questions.filter(x=>x.done).length}/${body.questions.length}</span>${body.questions.length ? button('toggle-discussion','Скрыть вопросы','','ghost','aria-controls="discussion-contents" aria-expanded="true"') : ''}`);
+  return editorHeading('02','Обсуждение мероприятия','',`<span class="section-progress">${body.questions.filter(x=>x.done).length}/${body.questions.length}</span>${body.questions.length ? button('toggle-discussion','Скрыть вопросы','','ghost','aria-controls="discussion-contents" aria-expanded="true"') : ''}`);
 }
 function checklistTools(group) {
   const selected = current(), body = selected?.kind === 'event' ? selected.payload.body : selected?.payload, hasItems = Boolean(body?.[group]?.length);
@@ -307,7 +309,7 @@ function taskActions(body) {
   return `<div class="task-actions">${button('add-task','Добавить задачу','plus','ghost')}${body.tasks.length ? button('clear-tasks','Очистить все задачи','trash','ghost') : ''}${body.tasksRecovery?.length ? `${button('restore-tasks',`Вернуть задачи (${body.tasksRecovery.length})`,'back','secondary')}${button('discard-recovered','Удалить удалённые задачи','trash','ghost','data-group="tasks"')}` : ''}</div>`;
 }
 function questionActions(body) {
-  return `<div class="task-actions">${button('add-question','Добавить вопрос','plus','ghost')}${body.questions.length ? button('clear-questions','Очистить все вопросы','trash','ghost') : ''}${body.questionsRecovery?.length ? `${button('restore-questions',`Вернуть вопросы (${body.questionsRecovery.length})`,'back','secondary')}${button('discard-recovered','Удалить удалённые вопросы','trash','ghost','data-group="questions"')}` : ''}</div>`;
+  return `<div class="task-actions">${button('add-question','Добавить вопрос','plus','ghost')}${button('import-questions','Импорт из Excel','upload','ghost')}${button('download-task-workbook','Шаблон .xlsx','download','ghost','data-group="questions"')}${body.questions.length ? button('clear-questions','Очистить все вопросы','trash','ghost') : ''}${body.questionsRecovery?.length ? `${button('restore-questions',`Вернуть вопросы (${body.questionsRecovery.length})`,'back','secondary')}${button('discard-recovered','Удалить удалённые вопросы','trash','ghost','data-group="questions"')}` : ''}</div>`;
 }
 function eventCategory(category) {
   return `<label class="field">Тип мероприятия<select id="event-category" data-field="category">${Object.entries(CATEGORIES).map(([id,label])=>`<option value="${id}" ${category === id ? 'selected' : ''}>${label}</option>`).join('')}</select></label>`;
@@ -319,19 +321,20 @@ function showCreateTemplate() {
   modal('Свой шаблон', `<label class="field">Название<input id="new-template-name" maxlength="120" placeholder="Например, камерная свадьба"></label><label class="field">Тип мероприятия<select id="new-template-category">${Object.entries(CATEGORIES).map(([id,label]) => `<option value="${id}">${label}</option>`).join('')}</select></label>`, `${button('close-modal','Отмена','','secondary')}${button('create-template','Создать шаблон','plus','primary')}`);
   $('#new-template-name').focus();
 }
-let pendingTaskImport;
-function showTaskImport() {
+let pendingTaskImport, taskImportGroup = 'tasks';
+function showTaskImport(group = 'tasks') {
+  taskImportGroup = group === 'questions' ? 'questions' : 'tasks';
   pendingTaskImport = null;
-  modal('Задачи из Excel', `<p>В первом столбце — задачи, каждая с новой строки. Первая строка «Задача» — заголовок. Пустые строки пропускаются.</p>${button('download-task-workbook','Скачать шаблон .xlsx','download','secondary')}<label class="field import-file">Выбрать файл<input id="task-import-file" type="file" accept=".xlsx,.xls,.csv,.txt"></label>`);
+  modal(taskImportGroup === 'questions' ? 'Вопросы из Excel' : 'Задачи из Excel', `<p>Первый столбец: один пункт в каждой строке.</p>${button('download-task-workbook','Скачать шаблон .xlsx','download','secondary', `data-group="${taskImportGroup}"`)}<label class="field import-file">Выбрать файл<input id="task-import-file" type="file" accept=".xlsx,.xls,.csv,.txt"></label>`);
 }
 async function previewTaskImport(file) {
   if (!file) return;
-  const targetId = state.selected, labels = await parseTaskFile(file), target = record(targetId);
-  if (state.selected !== targetId || !target || !$('#modal').open) return;
+  const group = taskImportGroup, targetId = state.selected, labels = await parseTaskFile(file, group), target = record(targetId);
+  if (state.selected !== targetId || group !== taskImportGroup || !target || !$('#modal').open) return;
   const body = target.kind === 'event' ? target.payload.body : target.payload;
-  if (body.tasks.length + labels.length > 500) throw new Error('В одном списке может быть не больше 500 задач. Уменьши файл или текущий список.');
-  pendingTaskImport = { targetId, labels };
-  modal('Проверка импорта', `<p>Будет добавлено задач: <strong>${labels.length}</strong>.</p><ol class="import-preview">${labels.slice(0,8).map(label=>`<li>${esc(label)}</li>`).join('')}</ol>${labels.length > 8 ? `<p>И ещё ${labels.length - 8}.</p>` : ''}`, `${button('close-modal','Отмена','','secondary')}${button('confirm-task-import','Добавить задачи','plus','primary')}`);
+  if (body[group].length + labels.length > 500) throw new Error('В одном списке может быть не больше 500 пунктов. Уменьши файл или текущий список.');
+  pendingTaskImport = { targetId, labels, group };
+  modal('Проверка импорта', `<p>Будет добавлено ${group === 'questions' ? 'вопросов' : 'задач'}: <strong>${labels.length}</strong>.</p><ol class="import-preview">${labels.slice(0,8).map(label=>`<li>${esc(label)}</li>`).join('')}</ol>${labels.length > 8 ? `<p>И ещё ${labels.length - 8}.</p>` : ''}`, `${button('close-modal','Отмена','','secondary')}${button('confirm-task-import',group === 'questions' ? 'Добавить вопросы' : 'Добавить задачи','plus','primary')}`);
 }
 function renderChecklist(items, group, template = false) {
   if (!items.some(x => x.section?.trim())) return items.map(x => checklistItem(x, group, template)).join('');
@@ -356,7 +359,7 @@ function changesView() {
   const entries = state.records.flatMap(r => (Array.isArray(r.payload._history) ? r.payload._history : []).map(entry => ({ r, entry })))
     .filter(x => typeof x.entry?.at === 'string' && Number.isFinite(Date.parse(x.entry.at)) && Array.isArray(x.entry.changes))
     .sort((a,b) => b.entry.at.localeCompare(a.entry.at));
-  return `<div class="page-heading"><div><h1>История изменений</h1></div></div><div class="toolbar">${button('clear-history','Очистить историю и память','trash','secondary')}${button('backup','Скачать резервную копию','download','ghost')}</div><div class="change-log">${entries.slice(0,100).map(({r,entry})=>`<article class="panel change-entry"><div class="change-meta"><time datetime="${esc(entry.at)}">${esc(fmt(entry.at,{day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'}))}</time><span>${esc(entry.deviceLabel || 'Устройство не указано')}</span></div><button class="change-title" data-action="${r.kind === 'event' ? 'open-event' : 'open-template'}" data-id="${esc(r.id)}">${esc(r.kind === 'event' ? cleanTitle(r.payload.source.title) : r.payload.name)}</button><p>${entry.changes.map(x=>esc(x.label)).join(' · ')}</p><details><summary>Что изменилось</summary>${entry.changes.map(x=>`<div class="change-values"><strong>${esc(x.label)}</strong><p><span>Было:</span> ${esc(x.before || 'Пусто')}</p><p><span>Стало:</span> ${esc(x.after || 'Пусто')}</p></div>`).join('')}</details></article>`).join('') || '<section class="panel"><h2>Изменений пока нет</h2><p>Новые правки появятся здесь вместе с временем и устройством. Старые изменения до включения журнала восстановить нельзя.</p></section>'}</div>`;
+  return `<div class="page-heading"><div><h1>Изменения</h1></div></div><div class="toolbar change-tools">${button('clear-history','Очистить историю','trash','secondary')}${button('backup','Скачать копию','download','ghost')}</div><div class="change-log">${entries.slice(0,100).map(({r,entry})=>`<article class="change-entry"><div class="change-row"><button class="change-title" data-action="${r.kind === 'event' ? 'open-event' : 'open-template'}" data-id="${esc(r.id)}">${esc(r.kind === 'event' ? cleanTitle(r.payload.source.title) : r.payload.name)}</button><div class="change-meta"><time datetime="${esc(entry.at)}">${esc(fmt(entry.at,{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}))}</time><span>${esc(entry.deviceLabel || 'Устройство')}</span></div></div><details><summary aria-label="Подробности изменения">${entry.changes.slice(0,3).map(x=>esc(x.label)).join(' · ')}${entry.changes.length > 3 ? ` · ещё ${entry.changes.length - 3}` : ''}</summary>${entry.changes.map(x=>`<div class="change-values"><strong>${esc(x.label)}</strong><p><span>Было:</span> ${esc(x.before || 'Пусто')}</p><p><span>Стало:</span> ${esc(x.after || 'Пусто')}</p></div>`).join('')}</details></article>`).join('') || '<p>Изменений пока нет.</p>'}</div>`;
 }
 async function clearOldShells() {
   if (!('caches' in window) || !navigator.serviceWorker?.controller) return 0;
@@ -526,23 +529,24 @@ document.addEventListener('click', safeAction(async e => {
     const next = createTemplate($('#new-template-name').value, $('#new-template-category').value);
     state.records.push(next); changed(next); closeModal(); navigate('templates', next.id); toast('Свой шаблон создан. Добавь вопросы и задачи.'); return;
   }
-  if (action === 'import-tasks') return showTaskImport();
-  if (action === 'download-task-workbook') return downloadTaskWorkbook();
+  if (action === 'import-tasks' || action === 'import-questions') return showTaskImport(action === 'import-questions' ? 'questions' : 'tasks');
+  if (action === 'download-task-workbook') return downloadTaskWorkbook(el.dataset.group === 'questions' ? 'questions' : 'tasks');
   if (action === 'confirm-task-import') {
     const pending = pendingTaskImport, r = pending && record(pending.targetId);
     if (!r || state.selected !== pending.targetId) throw new Error('Открой нужную карточку и повтори импорт.');
     const body = r.kind === 'event' ? r.payload.body : r.payload;
-    if (body.tasks.length + pending.labels.length > 500) throw new Error('Не больше 500 задач в одном списке.');
-    body.tasks.push(...pending.labels.map(label => item(label))); changed(r); pendingTaskImport = null; closeModal(); render(); toast(`Добавлено задач: ${pending.labels.length}`); return;
+    if (body[pending.group].length + pending.labels.length > 500) throw new Error('Не больше 500 пунктов в одном списке.');
+    body[pending.group].push(...pending.labels.map(label => item(label))); changed(r); pendingTaskImport = null; closeModal(); render(); toast(`Добавлено ${pending.group === 'questions' ? 'вопросов' : 'задач'}: ${pending.labels.length}`); return;
   }
   if (action === 'toggle-items') {
     const panel = el.closest('.panel'), items = [...panel.querySelectorAll('.item-disclosure')], expand = !items.every(x => x.open);
     for (const details of panel.querySelectorAll('.checklist-section, .item-disclosure')) details.open = expand;
     el.setAttribute('aria-expanded', String(expand)); el.querySelector('span').textContent = expand ? 'Свернуть пункты' : 'Развернуть пункты'; return;
   }
-  if (action === 'toggle-discussion') {
-    const block = $('#discussion-contents'); block.open = !block.open;
-    el.setAttribute('aria-expanded',String(block.open)); el.querySelector('span').textContent = block.open ? 'Скрыть вопросы' : 'Показать вопросы'; return;
+  if (action === 'toggle-discussion' || action === 'toggle-preparation') {
+    const preparation = action === 'toggle-preparation';
+    const block = $(preparation ? '#preparation-contents' : '#discussion-contents'); block.open = !block.open;
+    el.setAttribute('aria-expanded',String(block.open)); el.querySelector('span').textContent = block.open ? (preparation ? 'Скрыть задачи' : 'Скрыть вопросы') : (preparation ? 'Показать задачи' : 'Показать вопросы'); return;
   }
   if (action === 'navigate') return navigate(el.dataset.route);
   if (action === 'close-modal') return closeModal();
@@ -607,7 +611,7 @@ document.addEventListener('input', safeAction(async e => {
     const key = el.dataset.field;
     if (r.kind === 'template' && key === 'template-name') r.payload.name = el.value;
     else if (r.kind === 'template' && key === 'template-category' && Object.hasOwn(CATEGORIES, el.value)) r.payload.category = el.value;
-    else if (r.kind === 'event' && ['description', 'notes', 'category', 'scriptUrl', 'questionnaires', 'totalCost', 'team'].includes(key)) {
+    else if (r.kind === 'event' && ['description', 'notes', 'category', 'scriptUrl', 'questionnaires', 'totalCost', 'team', 'venue', 'prepayment'].includes(key)) {
       if (key === 'scriptUrl') {
         const checked = scriptLink(el.value);
         $('#script-open').innerHTML = scriptAction(el.value);
