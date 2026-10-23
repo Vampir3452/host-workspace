@@ -671,7 +671,8 @@ dialog::backdrop { background: #112c2b66; backdrop-filter: blur(3px); }
 .event-info-grid dd { margin: 4px 0 0; overflow-wrap: anywhere; font-weight: 500; }
 .event-cost-team { display: grid; grid-template-columns: minmax(110px, 180px) minmax(110px, 180px) minmax(180px, 1fr); gap: 12px; align-items: start; }
 .event-cost-team .field { margin: 0; }
-.event-cost-team textarea[data-field="team"] { min-height: 44px; height: 44px; }
+.event-quick-info textarea[data-auto-grow], textarea.questionnaires-field[data-auto-grow] { min-height: 44px; height: auto; padding: 8px 12px; resize: none; overflow-y: hidden; }
+.compact-event-description .rich-editor { min-height: 44px; padding: 8px 12px; }
 .event-info-grid input { min-width: 0; width: 100%; }
 .question-block > summary[hidden], #preparation-contents > summary[hidden] { display: none; }
 .calendar-layout { grid-template-columns: minmax(0, 1fr); gap: 16px; }
