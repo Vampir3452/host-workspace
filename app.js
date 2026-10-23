@@ -6,7 +6,7 @@ import { renderRichEditor, wireRichEditors } from './lib/rich-text.js';
 import { recordChanges, describeDevice } from './lib/change-history.js';
 import { CATEGORIES, SCHEMA_VERSION, clone, sameContent, uid, item, createTemplate, clearTaskList, restoreTaskList, clearQuestionList, restoreQuestionList, discardRecoveredItems, replaceTemplateTasks, applyTemplate, cleanTitle, progress, localDate, defaultTemplates, seedWeddingTemplate, demoRecords, reconcileCalendar, scriptLink, validateBackup, restorePlan } from './lib/model.js';
 
-const APP_VERSION = '0.4.9';
+const APP_VERSION = '0.4.10';
 const historyBaseline = new Map();
 const device = (() => {
   try {
@@ -194,7 +194,7 @@ function loginView(message = '') {
 function navigation(route, label, glyph) { return `<button class="nav-item ${state.route === route ? 'active' : ''}" data-action="navigate" data-route="${route}" ${state.route === route ? 'aria-current="page"' : ''}>${icon(glyph)}<span>${label}</span>${route === 'settings' ? '<span id="conflict-count"></span>' : ''}</button>`; }
 function shell() {
   const title = state.route === 'changes' ? 'История изменений' : state.route === 'templates' ? 'Шаблоны' : state.route === 'settings' ? 'Настройки' : state.route === 'event' ? 'Мероприятия / Подготовка' : state.route === 'archive' ? 'История мероприятий' : 'Мероприятия';
-  return `<div class="shell"><aside class="sidebar"><a class="brand" href="#calendar" data-action="navigate" data-route="calendar"><span class="brand-mark">LG</span><span class="brand-copy">Let’s Go!<small>Кабинет ведущего</small></span></a><nav class="nav" aria-label="Основная навигация">${navigation('calendar', 'Мероприятия', 'calendar')}${navigation('templates', 'Шаблоны', 'templates')}${navigation('archive', 'Архив', 'clock')}${navigation('changes', 'Изменения', 'note')}${navigation('settings', 'Настройки', 'settings')}</nav><div class="sidebar-bottom"><div class="notice">${icon('spark')}<p>Подготовка по шагам.<br>Вечер — с удовольствием.</p></div><div class="profile"><span class="avatar">ДП</span><div class="profile-copy"><strong>Дмитрий</strong><small>${state.demo ? 'Демонстрационный кабинет' : 'Личный кабинет'}</small></div>${iconButton('exit', state.demo ? 'Выйти из примера' : 'Выйти из аккаунта', 'logout')}</div></div></aside><div class="main"><header class="topbar"><span class="breadcrumb">${title}</span>${button('update-site','Обновить интерфейс','download','secondary interface-update')}<div class="top-actions"><div id="save-status" role="status" aria-live="polite"></div>${iconButton('sync', 'Обновить данные и календарь', 'refresh')}</div></header><main id="main" class="page">${state.demo ? `<div class="demo-banner"><span>Пример кабинета · мероприятия вымышлены, изменения сохраняются только здесь</span><button data-action="exit">Войти в свой кабинет ${icon('arrow')}</button></div>` : ''}${state.cloudError ? `<div class="notice error-text" role="alert">${esc(state.cloudError)} ${button('sync', 'Повторить', 'refresh', 'ghost')}</div>` : ''}${state.calendarError ? `<div class="notice error-text" role="alert">${esc(state.calendarError)}</div>` : ''}${conflicts().length ? `<div class="notice">Есть разные версии записей на устройствах. ${button('conflicts', 'Выбрать версии', '', 'ghost')}</div>` : ''}<div id="page-content"></div></main></div></div>`;
+  return `<div class="shell"><aside class="sidebar"><a class="brand" href="#calendar" data-action="navigate" data-route="calendar"><span class="brand-mark">LG</span><span class="brand-copy">Let’s Go!<small>Кабинет ведущего</small></span></a><nav class="nav" aria-label="Основная навигация">${navigation('calendar', 'Мероприятия', 'calendar')}${navigation('templates', 'Шаблоны', 'templates')}${navigation('archive', 'Архив', 'clock')}${navigation('changes', 'Изменения', 'note')}${navigation('settings', 'Настройки', 'settings')}</nav><div class="sidebar-bottom"><div class="notice">${icon('spark')}<p>Подготовка по шагам.<br>Вечер — с удовольствием.</p></div><div class="profile"><span class="avatar">ДП</span><div class="profile-copy"><strong>Дмитрий</strong><small>${state.demo ? 'Демонстрационный кабинет' : 'Личный кабинет'}</small></div>${iconButton('exit', state.demo ? 'Выйти из примера' : 'Выйти из аккаунта', 'logout')}</div></div></aside><div class="main"><header class="topbar"><span class="breadcrumb">${title}</span><div class="interface-tools" role="group" aria-label="Версия сайта">${button('update-site','Обновить интерфейс','download','secondary interface-update')}${button('clear-cache','Очистить кэш','trash','secondary interface-update')}</div><div class="top-actions"><div id="save-status" role="status" aria-live="polite"></div>${iconButton('sync', 'Обновить данные и календарь', 'refresh')}</div></header><main id="main" class="page">${state.demo ? `<div class="demo-banner"><span>Пример кабинета · мероприятия вымышлены, изменения сохраняются только здесь</span><button data-action="exit">Войти в свой кабинет ${icon('arrow')}</button></div>` : ''}${state.cloudError ? `<div class="notice error-text" role="alert">${esc(state.cloudError)} ${button('sync', 'Повторить', 'refresh', 'ghost')}</div>` : ''}${state.calendarError ? `<div class="notice error-text" role="alert">${esc(state.calendarError)}</div>` : ''}${conflicts().length ? `<div class="notice">Есть разные версии записей на устройствах. ${button('conflicts', 'Выбрать версии', '', 'ghost')}</div>` : ''}<div id="page-content"></div></main></div></div>`;
 }
 let renderedEditorKey;
 function render() {
@@ -483,14 +483,14 @@ document.addEventListener('click', safeAction(async e => {
     await persistQueue; const count = await db.clearAuxiliaryMeta(state.scope), cachesRemoved = await clearOldShells();
     closeModal(); render(); toast(`История очищена. Удалено служебных снимков: ${count}, старых версий: ${cachesRemoved}.`); sync(false); return;
   }
-  if (action === 'update-site') {
+  if (action === 'update-site' || action === 'clear-cache') {
     if (!navigator.onLine) throw new Error('Для обновления интерфейса нужен интернет. Записи доступны без обновления.');
     el.disabled = true; el.setAttribute('aria-busy','true');
     try {
     await persistQueue;
     if (state.persistError) throw new Error('Сначала скачай резервную копию: на устройстве есть ошибка сохранения.');
     if (!state.demo && navigator.onLine) await sync(false);
-    location.assign('./update.html?apply=1');
+    location.assign(action === 'clear-cache' ? './update.html?apply=1&clear=1' : './update.html?apply=1');
     } catch(error) { el.disabled = false; el.removeAttribute('aria-busy'); throw error; }
     return;
   }

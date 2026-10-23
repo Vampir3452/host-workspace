@@ -1,11 +1,21 @@
 const button = document.querySelector('#update-site');
 const status = document.querySelector('#update-status');
+const clearCache = new URLSearchParams(location.search).get('clear') === '1';
+if (clearCache) button.textContent = 'Очистить кэш и открыть кабинет';
 button.addEventListener('click', async () => {
   button.disabled = true;
-  status.textContent = 'Загружаем актуальный интерфейс…';
+    status.textContent = clearCache ? 'Обновляем файлы сайта…' : 'Загружаем актуальный интерфейс…';
   try {
     if (!navigator.onLine) throw new Error('Для загрузки обновления нужен интернет.');
     if (!('serviceWorker' in navigator)) { location.replace('./'); return; }
+    if (clearCache) {
+      const scope = new URL('./', location.href);
+      const previous = await navigator.serviceWorker.getRegistration(scope.href);
+      if (previous?.scope === scope.href) await previous.unregister();
+      const prefix = `zk-shell:${scope.pathname}:`;
+      const keys = await caches.keys();
+      await Promise.all(keys.filter(key => key.startsWith(prefix)).map(key => caches.delete(key)));
+    }
     const registration = await navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' });
     await registration.update();
     const installing = registration.installing;

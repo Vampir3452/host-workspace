@@ -73,7 +73,10 @@ strong { font-weight: 600; }
 .breadcrumb a { text-decoration: none; }
 .breadcrumb span { margin: 0 8px; color: #969d95; }
 .top-actions { display: flex; align-items: center; justify-content: flex-end; gap: 13px; flex-wrap: wrap; }
-.interface-update { white-space: nowrap; }
+.interface-tools { display: flex; gap: 6px; margin-left: auto; flex-wrap: wrap; }
+.interface-tools .interface-update { white-space: nowrap; padding: 6px 9px; min-height: 36px; font-size: 12px; gap: 5px; }
+.interface-tools .interface-update svg { width: 14px; height: 14px; }
+@media (pointer: coarse) { .interface-tools .interface-update { min-height: 44px; } }
 @media (max-width: 600px) {
   .topbar { flex-wrap: wrap; }
   .topbar > .top-actions { flex: 1 1 100%; justify-content: space-between; }
