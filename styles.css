@@ -346,12 +346,13 @@ dialog::backdrop { background: #112c2b66; backdrop-filter: blur(3px); }
 .task-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .app-version { font-size: 11px; color: var(--muted); }
 .change-log { max-width: 1000px; border: 1px solid var(--line); border-radius: 12px; background: white; overflow: hidden; }
-.change-entry { padding: 10px 16px; overflow-wrap: anywhere; border-bottom: 1px solid var(--line); }
+.change-entry { padding: 8px 14px; overflow-wrap: anywhere; border-bottom: 1px solid var(--line); }
 .change-entry:last-child { border-bottom: 0; }
 .change-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px 16px; }
 .change-meta { display: flex; flex-wrap: wrap; gap: 4px 12px; color: var(--muted); font-size: 12px; }
-.change-title { min-height: 32px; padding: 3px 0; text-align: left; color: var(--forest); font-size: 14px; font-weight: 600; }
-.change-entry summary { cursor: pointer; min-height: 30px; padding: 4px 0; font-size: 13px; }
+.change-title { min-height: 24px; padding: 2px 0; border: 0; background: transparent; cursor: pointer; text-align: left; color: var(--forest); font-family: inherit; font-size: 14px; font-weight: 600; }
+.change-title:hover { text-decoration: underline; }
+.change-entry summary { cursor: pointer; min-height: 24px; padding: 3px 0; font-size: 13px; }
 .change-values { padding: 8px 0; border-top: 1px solid var(--line); font-size: 13px; display: grid; gap: 4px; }
 .change-values p { margin: 0; white-space: pre-wrap; }
 .change-values p > span { color: var(--muted); }
@@ -668,4 +669,5 @@ dialog::backdrop { background: #112c2b66; backdrop-filter: blur(3px); }
 .event-cost-team .field { margin: 0; }
 .event-cost-team textarea[data-field="team"] { min-height: 44px; height: 44px; }
 .event-info-grid input { min-width: 0; width: 100%; }
+.question-block > summary[hidden], #preparation-contents > summary[hidden] { display: none; }
 @media (max-width: 600px) { .event-quick-info { padding: 16px; } .event-info-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 12px; } .event-cost-team { grid-template-columns: 1fr; gap: 10px; } }
