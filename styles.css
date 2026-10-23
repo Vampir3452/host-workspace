@@ -342,6 +342,10 @@ dialog::backdrop { background: #112c2b66; backdrop-filter: blur(3px); }
 .template-editor > .panel { padding: 20px 24px; }
 .template-editor .panel-header { margin-bottom: 10px; }
 .own-templates { margin-top: 20px; }
+.deleted-templates { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 8px; }
+.deleted-templates > summary { cursor: pointer; padding: 8px 0; }
+.deleted-templates > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 0; }
+.deleted-templates .button { font-size: 12px; padding: 6px 9px; }
 .update-page { max-width: 720px; margin: 8vh auto; padding: 20px; line-height: 1.65; }
 .task-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .app-version { font-size: 11px; color: var(--muted); }
